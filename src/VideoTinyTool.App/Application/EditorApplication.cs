@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.Versioning;
 using SFML.Graphics;
 using SFML.System;
@@ -538,6 +538,16 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         {
             _timelinePanel.ScrollToPlayhead();
         }
+    }
+
+    public void TogglePlayback()
+    {
+        if (_timeline.Clips.Count == 0)
+        {
+            return;
+        }
+
+        Dispatch(EditorCommand.TogglePlay);
     }
 
     public void EndScrub(bool resumePlayback)

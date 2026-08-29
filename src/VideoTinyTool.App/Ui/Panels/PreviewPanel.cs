@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using SFML.Graphics;
 using SFML.System;
 using SFML.Window;
@@ -26,7 +26,7 @@ public sealed class PreviewPanel : PanelBase
 
         _toStart.Clicked += () => _host.SeekTo(TimeSpan.Zero, false);
         _toEnd.Clicked += () => _host.SeekTo(_host.Timeline.TotalDuration, false);
-        _playPause.Clicked += () => _host.Player.TogglePlay();
+        _playPause.Clicked += () => _host.TogglePlayback();
 
         _scrub.ValueChanged += value =>
             _host.SeekTo(TimeSpan.FromTicks((long)(_host.Timeline.TotalDuration.Ticks * value)), true);
@@ -211,6 +211,12 @@ public sealed class PreviewPanel : PanelBase
 
         if (_host.Timeline.Clips.Count == 0)
         {
+            return;
+        }
+
+        if (FrameBounds.Contains(point))
+        {
+            _host.TogglePlayback();
             return;
         }
 

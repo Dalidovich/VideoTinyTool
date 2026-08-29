@@ -1,4 +1,4 @@
-using VideoTinyTool.Application;
+﻿using VideoTinyTool.Application;
 using VideoTinyTool.Commands;
 using VideoTinyTool.Domain;
 using VideoTinyTool.Media;
@@ -40,6 +40,8 @@ public interface IEditorHost
     void SeekTo(TimeSpan position, bool scrubbing);
 
     void EndScrub(bool resumePlayback);
+
+    void TogglePlayback();
 
     void ImportFiles();
 
