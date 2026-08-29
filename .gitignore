@@ -1,0 +1,63 @@
+## Build output
+[Bb]in/
+[Oo]bj/
+[Pp]ublish/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.binlog
+
+## Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.DotSettings.user
+
+## NuGet
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+project.lock.json
+project.assets.json
+
+## Test and coverage output
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+*.trx
+
+## Third-party binaries staged locally
+tools/*.exe
+tools/*.dll
+
+## Debug and profiling artifacts
+*.pdb
+*.mdb
+*.ilk
+*.pch
+*.dmp
+*.psess
+*.vsp
+*.vspx
+
+## OS noise
+[Tt]humbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+## Local overrides and secrets
+*.local.json
+appsettings.*.local.json
+*.env
+.env.local

@@ -1,0 +1,7 @@
+<Project>
+
+  <PropertyGroup>
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3246</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
+</Project>

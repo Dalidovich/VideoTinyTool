@@ -1,0 +1,159 @@
+using SFML.Graphics;
+using SFML.System;
+using SFML.Window;
+using VideoTinyTool.Ui.Widgets;
+
+namespace VideoTinyTool.Ui.Panels;
+
+public sealed class ToolbarPanel : PanelBase
+{
+    private readonly IEditorHost _host;
+    private readonly Button _import = new("Import…");
+    private readonly Button _split = new("Split");
+    private readonly Button _remove = new("Remove");
+    private readonly Button _undo = new("Undo", ButtonStyle.Ghost);
+    private readonly Button _redo = new("Redo", ButtonStyle.Ghost);
+    private readonly Button _export = new("Export…", ButtonStyle.Accent);
+
+    private float _separatorX;
+
+    public ToolbarPanel(IEditorHost host)
+    {
+        _host = host;
+
+        _import.Clicked += host.ImportFiles;
+        _split.Clicked += host.SplitAtPlayhead;
+        _remove.Clicked += host.RemoveSelectedClip;
+        _undo.Clicked += host.Undo;
+        _redo.Clicked += host.Redo;
+        _export.Clicked += host.ExportTimeline;
+    }
+
+    private IEnumerable<Button> Buttons
+    {
+        get
+        {
+            yield return _import;
+            yield return _split;
+            yield return _remove;
+            yield return _undo;
+            yield return _redo;
+            yield return _export;
+        }
+    }
+
+    public void Layout(Renderer renderer)
+    {
+        const float gap = 5f;
+        const float height = 24f;
+
+        var top = Bounds.Top + ((Bounds.Height - height) / 2f);
+        var x = Bounds.Left + 12f + renderer.MeasureText("VideoTinyTool", Theme.FontSizeBrand, TextFont.SemiBold) + 18f;
+
+        foreach (var button in new[] { _import, _split, _remove })
+        {
+            var width = button.PreferredWidth(renderer);
+            button.Bounds = new FloatRect(new Vector2f(MathF.Round(x), MathF.Round(top)), new Vector2f(width, height));
+            x += width + gap;
+        }
+
+        _separatorX = MathF.Round(x + 4f);
+        x += 13f;
+
+        foreach (var button in new[] { _undo, _redo })
+        {
+            var width = button.PreferredWidth(renderer);
+            button.Bounds = new FloatRect(new Vector2f(MathF.Round(x), MathF.Round(top)), new Vector2f(width, height));
+            x += width + gap;
+        }
+
+        var exportWidth = _export.PreferredWidth(renderer) + 6f;
+        _export.Bounds = new FloatRect(
+            new Vector2f(MathF.Round(Bounds.Left + Bounds.Width - 12f - exportWidth), MathF.Round(top)),
+            new Vector2f(exportWidth, height));
+    }
+
+    private void RefreshEnabled()
+    {
+        _split.Enabled = _host.SelectedClip is not null;
+        _remove.Enabled = _host.SelectedClip is not null;
+        _undo.Enabled = _host.History.CanUndo;
+        _redo.Enabled = _host.History.CanRedo;
+        _export.Enabled = _host.Timeline.Clips.Count > 0;
+    }
+
+    public override void Draw(Renderer renderer)
+    {
+        RefreshEnabled();
+
+        renderer.FillRect(Bounds, Theme.Chrome);
+        renderer.HorizontalLine(Bounds.Left, Bounds.Top + Bounds.Height - 1, Bounds.Width, Theme.Line);
+
+        var brandY = Bounds.Top + 10f;
+        var x = Bounds.Left + 12f;
+        x += renderer.DrawText("Video", x, brandY, Theme.FontSizeBrand, Theme.Text, TextFont.SemiBold);
+        x += renderer.DrawText("Tiny", x, brandY, Theme.FontSizeBrand, Theme.Accent, TextFont.SemiBold);
+        renderer.DrawText("Tool", x, brandY, Theme.FontSizeBrand, Theme.Text, TextFont.SemiBold);
+
+        renderer.FillRect(_separatorX, Bounds.Top + 10f, 1, 18f, Theme.LineStrong);
+
+        foreach (var button in Buttons)
+        {
+            button.Draw(renderer);
+        }
+
+        renderer.DrawText(
+            TimeFormat.Timecode(_host.Timeline.TotalDuration),
+            _export.Bounds.Left - 14f,
+            Bounds.Top + 12f,
+            Theme.FontSizeSmall,
+            Theme.TextDim,
+            TextFont.Mono,
+            TextAlign.Right);
+    }
+
+    public override void OnMouseMove(Vector2f point)
+    {
+        foreach (var button in Buttons)
+        {
+            button.UpdateHover(point);
+        }
+    }
+
+    public override void OnMouseDown(Vector2f point, Mouse.Button button, bool doubleClick)
+    {
+        if (button != Mouse.Button.Left)
+        {
+            return;
+        }
+
+        foreach (var candidate in Buttons)
+        {
+            candidate.OnMouseDown(point);
+        }
+    }
+
+    public override void OnMouseUp(Vector2f point, Mouse.Button button)
+    {
+        if (button != Mouse.Button.Left)
+        {
+            return;
+        }
+
+        foreach (var candidate in Buttons)
+        {
+            if (candidate.OnMouseUp(point))
+            {
+                return;
+            }
+        }
+    }
+
+    public override void OnMouseLeave()
+    {
+        foreach (var button in Buttons)
+        {
+            button.UpdateHover(new Vector2f(-1, -1));
+        }
+    }
+}
