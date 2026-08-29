@@ -9,10 +9,13 @@ namespace VideoTinyTool.Ui.Panels;
 
 public sealed class SourcesPanel : PanelBase
 {
+    private const float RemoveButtonSize = 20f;
+
     private readonly IEditorHost _host;
     private readonly ScrollableList _list = new();
 
     private int _hoverIndex = -1;
+    private bool _hoverRemove;
 
     public SourcesPanel(IEditorHost host)
     {
@@ -84,8 +87,26 @@ public sealed class SourcesPanel : PanelBase
             renderer.FillRect(thumbBounds, Theme.ClipFace);
         }
 
+        var remove = RemoveBounds(row);
+        var hoveredRow = _hoverIndex == index;
+
+        if (hoveredRow || selected)
+        {
+            renderer.DrawTextCentered(
+                "×",
+                remove,
+                Theme.FontSizeBody,
+                hoveredRow && _hoverRemove ? Theme.Text : Theme.TextFaint,
+                TextFont.SemiBold);
+
+            if (hoveredRow && _hoverRemove)
+            {
+                renderer.StrokeRect(remove, Theme.LineStrong);
+            }
+        }
+
         var textLeft = thumbBounds.Left + thumbBounds.Width + 9;
-        var textWidth = row.Left + row.Width - textLeft - Theme.Padding - 6;
+        var textWidth = remove.Left - textLeft - 8;
 
         renderer.DrawText(
             renderer.Ellipsize(source.FileName, textWidth, Theme.FontSizeBody),
@@ -120,9 +141,17 @@ public sealed class SourcesPanel : PanelBase
             TextFont.Mono);
     }
 
-    public override void OnMouseMove(Vector2f point) => _hoverIndex = _list.IndexAt(point);
+    public override void OnMouseMove(Vector2f point)
+    {
+        _hoverIndex = _list.IndexAt(point);
+        _hoverRemove = _hoverIndex >= 0 && RemoveBounds(_list.RowBounds(_hoverIndex)).Contains(point);
+    }
 
-    public override void OnMouseLeave() => _hoverIndex = -1;
+    public override void OnMouseLeave()
+    {
+        _hoverIndex = -1;
+        _hoverRemove = false;
+    }
 
     public override void OnMouseDown(Vector2f point, Mouse.Button button, bool doubleClick)
     {
@@ -138,6 +167,15 @@ public sealed class SourcesPanel : PanelBase
         }
 
         var source = _host.Sources[index];
+
+        if (RemoveBounds(_list.RowBounds(index)).Contains(point))
+        {
+            _host.RemoveSource(source);
+            _hoverIndex = -1;
+            _hoverRemove = false;
+            return;
+        }
+
         _host.SelectSource(source);
 
         if (doubleClick)
@@ -147,6 +185,12 @@ public sealed class SourcesPanel : PanelBase
     }
 
     public override void OnScroll(Vector2f point, float delta, bool control) => _list.Scroll(delta);
+
+    private static FloatRect RemoveBounds(FloatRect row) => new(
+        new Vector2f(
+            row.Left + row.Width - Theme.Padding - RemoveButtonSize,
+            row.Top + ((row.Height - RemoveButtonSize) / 2f)),
+        new Vector2f(RemoveButtonSize, RemoveButtonSize));
 
     public MediaSource? SourceAt(Vector2f point)
     {

@@ -86,6 +86,22 @@ public sealed class ThumbnailService : IDisposable
         }
     }
 
+    public void Forget(Guid sourceId)
+    {
+        foreach (var key in _cache.Keys.Where(key => key.SourceId == sourceId).ToArray())
+        {
+            if (_cache.Remove(key, out var texture))
+            {
+                texture?.Dispose();
+            }
+
+            if (_lruIndex.Remove(key, out var node))
+            {
+                _lru.Remove(node);
+            }
+        }
+    }
+
     private void Store(Key key, Texture? texture)
     {
         if (_cache.ContainsKey(key))

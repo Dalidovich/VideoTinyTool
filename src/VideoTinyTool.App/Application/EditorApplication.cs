@@ -455,6 +455,75 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         _selectedClip = clip;
     }
 
+    public void RemoveSource(MediaSource source)
+    {
+        if (_export.IsRunning)
+        {
+            return;
+        }
+
+        var index = _sources.IndexOf(source);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var usage = _timeline.Clips.Count(clip => clip.SourceId == source.Id);
+        if (usage == 0)
+        {
+            Execute(BuildRemoveSourceCommand(source, index));
+            return;
+        }
+
+        var dialog = new ModalDialog(
+            "Remove source",
+            usage == 1
+                ? $"{source.FileName} is used by one clip on the timeline. Removing the source removes that clip too."
+                : $"{source.FileName} is used by {usage} clips on the timeline. Removing the source removes those clips too.");
+
+        dialog.AddButton("Remove", ButtonStyle.Accent, () =>
+        {
+            dialog.Close();
+            if (_sources.Contains(source))
+            {
+                Execute(BuildRemoveSourceCommand(source, _sources.IndexOf(source)));
+            }
+        });
+
+        dialog.AddButton("Cancel", ButtonStyle.Normal, dialog.Close);
+        ShowDialog(dialog);
+    }
+
+    private RemoveSourceCommand BuildRemoveSourceCommand(MediaSource source, int index) =>
+        new(source, index, DetachSource, RestoreSource);
+
+    private void DetachSource(MediaSource source)
+    {
+        var index = _sources.IndexOf(source);
+        if (index >= 0)
+        {
+            _sources.RemoveAt(index);
+        }
+
+        _sourceIndex.Remove(source.Id);
+        _missingSources.Remove(source.Id);
+        _thumbnails.Forget(source.Id);
+
+        if (_selectedSource is not null && _selectedSource.Id == source.Id)
+        {
+            _selectedSource = _sources.Count == 0
+                ? null
+                : _sources[Math.Clamp(index, 0, _sources.Count - 1)];
+        }
+    }
+
+    private void RestoreSource(int index, MediaSource source)
+    {
+        _sources.Insert(Math.Clamp(index, 0, _sources.Count), source);
+        _sourceIndex[source.Id] = source;
+        _selectedSource ??= source;
+    }
+
     public void Execute(IEditCommand command)
     {
         _history.Execute(command);

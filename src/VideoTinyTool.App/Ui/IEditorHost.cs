@@ -33,6 +33,8 @@ public interface IEditorHost
 
     void AppendSourceToTimeline(MediaSource source);
 
+    void RemoveSource(MediaSource source);
+
     void Execute(IEditCommand command);
 
     void SeekTo(TimeSpan position, bool scrubbing);
