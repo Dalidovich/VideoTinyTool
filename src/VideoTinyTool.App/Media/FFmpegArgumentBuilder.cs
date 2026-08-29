@@ -7,6 +7,10 @@ namespace VideoTinyTool.Media;
 
 public readonly record struct ExportItem(string SourcePath, TimeSpan In, TimeSpan Out, bool HasAudio)
 {
+    public static ExportItem Gap(TimeSpan duration) => new(string.Empty, TimeSpan.Zero, duration, false);
+
+    public bool IsGap => SourcePath.Length == 0;
+
     public TimeSpan Duration => Out - In;
 }
 
@@ -20,6 +24,11 @@ public static class FFmpegArgumentBuilder
             if (!sources.TryGetValue(clip.SourceId, out var source))
             {
                 continue;
+            }
+
+            if (clip.LeadingGap > TimeSpan.Zero)
+            {
+                items.Add(ExportItem.Gap(clip.LeadingGap));
             }
 
             items.Add(new ExportItem(source.Path, clip.In, clip.Out, source.HasAudio));
@@ -40,6 +49,11 @@ public static class FFmpegArgumentBuilder
 
         foreach (var item in items)
         {
+            if (item.IsGap)
+            {
+                continue;
+            }
+
             args.Append(" -ss ").Append(Seconds(item.In));
             args.Append(" -t ").Append(Seconds(item.Duration));
             args.Append(" -i ").Append(Quote(item.SourcePath));
@@ -67,20 +81,32 @@ public static class FFmpegArgumentBuilder
         var graph = new StringBuilder();
         var concat = new StringBuilder();
 
+        var input = 0;
+
         for (var i = 0; i < items.Count; i++)
         {
             var item = items[i];
 
-            graph.Append('[').Append(i).Append(":v]");
-            graph.Append("scale=").Append(width).Append(':').Append(height)
-                 .Append(":force_original_aspect_ratio=decrease,");
-            graph.Append("pad=").Append(width).Append(':').Append(height).Append(":(ow-iw)/2:(oh-ih)/2,");
-            graph.Append("setsar=1,fps=").Append(fps).Append(",format=yuv420p");
+            if (item.IsGap)
+            {
+                graph.Append("color=c=black:s=").Append(width).Append('x').Append(height)
+                     .Append(":r=").Append(fps).Append(":d=").Append(Seconds(item.Duration));
+                graph.Append(",setsar=1,format=yuv420p");
+            }
+            else
+            {
+                graph.Append('[').Append(input).Append(":v]");
+                graph.Append("scale=").Append(width).Append(':').Append(height)
+                     .Append(":force_original_aspect_ratio=decrease,");
+                graph.Append("pad=").Append(width).Append(':').Append(height).Append(":(ow-iw)/2:(oh-ih)/2,");
+                graph.Append("setsar=1,fps=").Append(fps).Append(",format=yuv420p");
+            }
+
             graph.Append("[v").Append(i).Append("];");
 
-            if (item.HasAudio)
+            if (!item.IsGap && item.HasAudio)
             {
-                graph.Append('[').Append(i).Append(":a]");
+                graph.Append('[').Append(input).Append(":a]");
                 graph.Append("aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo");
             }
             else
@@ -93,6 +119,11 @@ public static class FFmpegArgumentBuilder
             graph.Append("[a").Append(i).Append("];");
 
             concat.Append("[v").Append(i).Append("][a").Append(i).Append(']');
+
+            if (!item.IsGap)
+            {
+                input++;
+            }
         }
 
         graph.Append(concat);

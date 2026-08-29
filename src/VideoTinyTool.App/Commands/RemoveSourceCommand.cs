@@ -8,7 +8,7 @@ public sealed class RemoveSourceCommand : IEditCommand
     private readonly int _sourceIndex;
     private readonly Action<MediaSource> _detach;
     private readonly Action<int, MediaSource> _restore;
-    private readonly List<(int Index, Clip Clip)> _removed = new();
+    private readonly List<(int Index, Clip Clip, TimeSpan Gap)> _removed = new();
 
     public RemoveSourceCommand(
         MediaSource source,
@@ -38,7 +38,14 @@ public sealed class RemoveSourceCommand : IEditCommand
                 continue;
             }
 
-            _removed.Add((index, clip));
+            _removed.Add((index, clip, clip.LeadingGap));
+
+            if (index + 1 < timeline.Clips.Count)
+            {
+                var follower = timeline.Clips[index + 1];
+                timeline.SetLeadingGap(follower, follower.LeadingGap + clip.LeadingGap + clip.Duration);
+            }
+
             timeline.RemoveAt(index);
         }
 
@@ -51,7 +58,16 @@ public sealed class RemoveSourceCommand : IEditCommand
 
         for (var i = _removed.Count - 1; i >= 0; i--)
         {
-            timeline.Insert(_removed[i].Index, _removed[i].Clip);
+            var (index, clip, gap) = _removed[i];
+
+            if (index < timeline.Clips.Count)
+            {
+                var follower = timeline.Clips[index];
+                timeline.SetLeadingGap(follower, follower.LeadingGap - gap - clip.Duration);
+            }
+
+            timeline.SetLeadingGap(clip, gap);
+            timeline.Insert(index, clip);
         }
     }
 }

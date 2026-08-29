@@ -98,14 +98,21 @@ public sealed class PreviewPanel : PanelBase
         var frame = FrameBounds;
         renderer.FillRect(frame, Theme.FrameVoid);
 
-        var texture = _host.Player.CurrentTexture;
-        if (texture is null || _host.Timeline.Clips.Count == 0)
+        if (_host.Timeline.Clips.Count == 0)
         {
-            renderer.DrawTextCentered(
-                _host.Timeline.Clips.Count == 0 ? "Timeline is empty" : "Preparing frame…",
-                frame,
-                Theme.FontSizeBody,
-                Theme.TextFaint);
+            renderer.DrawTextCentered("Timeline is empty", frame, Theme.FontSizeBody, Theme.TextFaint);
+            return;
+        }
+
+        if (_host.Player.InGap)
+        {
+            return;
+        }
+
+        var texture = _host.Player.CurrentTexture;
+        if (texture is null)
+        {
+            renderer.DrawTextCentered("Preparing frame…", frame, Theme.FontSizeBody, Theme.TextFaint);
             return;
         }
 

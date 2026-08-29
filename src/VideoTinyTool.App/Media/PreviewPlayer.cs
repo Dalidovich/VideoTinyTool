@@ -27,11 +27,13 @@ public sealed class PreviewPlayer : IDisposable
     private TimeSpan _pausedPosition = TimeSpan.Zero;
     private TimeSpan _audioAnchor = TimeSpan.Zero;
     private TimeSpan _globalAnchor = TimeSpan.Zero;
+    private TimeSpan _gapEnd = TimeSpan.Zero;
     private DateTime? _resumeAt;
     private Guid _stillToken;
     private double _rate = 1.0;
     private bool _scrubbing;
     private bool _liveFrameValid;
+    private bool _inGap;
     private bool _disposed;
 
     public PreviewPlayer(
@@ -59,7 +61,9 @@ public sealed class PreviewPlayer : IDisposable
 
     public double SourceAspect { get; private set; } = 16.0 / 9.0;
 
-    public Texture? CurrentTexture => _liveFrameValid ? _liveTexture : _stillTexture;
+    public bool InGap => _inGap;
+
+    public Texture? CurrentTexture => _inGap ? null : _liveFrameValid ? _liveTexture : _stillTexture;
 
     public TimeSpan Duration => _timeline.TotalDuration;
 
@@ -166,6 +170,7 @@ public sealed class PreviewPlayer : IDisposable
         if (_timeline.Clips.Count == 0)
         {
             _liveFrameValid = false;
+            _inGap = false;
             _stillTexture?.Dispose();
             _stillTexture = null;
             return;
@@ -198,6 +203,16 @@ public sealed class PreviewPlayer : IDisposable
             _rate = 1.0;
             _pausedPosition = Duration;
             RequestStillFrame(Duration - TimeSpan.FromMilliseconds(40));
+            return;
+        }
+
+        if (_inGap)
+        {
+            if (position >= _gapEnd)
+            {
+                StartPlayback(_gapEnd, withAudio: IsNormalRate(_rate));
+            }
+
             return;
         }
 
@@ -236,6 +251,11 @@ public sealed class PreviewPlayer : IDisposable
             return;
         }
 
+        if (_timeline.NextClipStart(pipeline.GlobalEnd) > pipeline.GlobalEnd)
+        {
+            return;
+        }
+
         _next = CreatePipeline(pipeline.ClipIndex + 1, pipeline.GlobalEnd, IsNormalRate(_rate));
         _next?.Start();
     }
@@ -248,6 +268,13 @@ public sealed class PreviewPlayer : IDisposable
             return;
         }
 
+        var nextStart = _timeline.NextClipStart(pipeline.GlobalEnd);
+        if (nextStart > pipeline.GlobalEnd)
+        {
+            EnterGap(pipeline.GlobalEnd, nextStart);
+            return;
+        }
+
         pipeline.Dispose();
         _current = _next;
         _next = null;
@@ -256,6 +283,21 @@ public sealed class PreviewPlayer : IDisposable
         _current?.Start();
 
         _sound.Ring = _current?.Ring ?? _silentRing;
+    }
+
+    private void EnterGap(TimeSpan from, TimeSpan until)
+    {
+        DisposePipelines();
+        SilenceAudio();
+
+        _gapEnd = until;
+        _inGap = true;
+        _liveFrameValid = false;
+        _stillToken = Guid.NewGuid();
+
+        _clock.StartSystem(from, _rate);
+        IsPlaying = true;
+        _resumeAt = null;
     }
 
     private void StartPlayback(TimeSpan position, bool withAudio)
@@ -274,7 +316,7 @@ public sealed class PreviewPlayer : IDisposable
         var location = _timeline.Resolve(target);
         if (location is null)
         {
-            _pausedPosition = target;
+            EnterGap(target, _timeline.NextClipStart(target));
             return;
         }
 
@@ -286,6 +328,7 @@ public sealed class PreviewPlayer : IDisposable
         }
 
         DisposePipelines();
+        _inGap = false;
 
         _current = new ClipPipeline(
             location.Value.Clip,
@@ -358,6 +401,12 @@ public sealed class PreviewPlayer : IDisposable
         _resumeAt = null;
         _clock.Reset(_pausedPosition);
 
+        SilenceAudio();
+        DisposePipelines();
+    }
+
+    private void SilenceAudio()
+    {
         try
         {
             _sound.Stop();
@@ -369,7 +418,6 @@ public sealed class PreviewPlayer : IDisposable
 
         _sound.Ring = _silentRing;
         _silentRing.Clear();
-        DisposePipelines();
     }
 
     private void DisposePipelines()
@@ -385,6 +433,7 @@ public sealed class PreviewPlayer : IDisposable
         if (_timeline.Clips.Count == 0)
         {
             _liveFrameValid = false;
+            _inGap = false;
             return;
         }
 
@@ -397,6 +446,9 @@ public sealed class PreviewPlayer : IDisposable
         var location = _timeline.Resolve(probe);
         if (location is null)
         {
+            _inGap = true;
+            _liveFrameValid = false;
+            _stillToken = Guid.NewGuid();
             return;
         }
 
@@ -406,6 +458,7 @@ public sealed class PreviewPlayer : IDisposable
             return;
         }
 
+        _inGap = false;
         _stillToken = _stillFrames.Request(source, location.Value.SourceOffset, _previewHeight);
         SourceAspect = source.AspectRatio;
     }

@@ -15,7 +15,7 @@ public sealed class Timeline
             var total = TimeSpan.Zero;
             foreach (var clip in _clips)
             {
-                total += clip.Duration;
+                total += clip.LeadingGap + clip.Duration;
             }
 
             return total;
@@ -56,6 +56,12 @@ public sealed class Timeline
         Changed?.Invoke();
     }
 
+    public void SetLeadingGap(Clip clip, TimeSpan gap)
+    {
+        clip.LeadingGap = gap < TimeSpan.Zero ? TimeSpan.Zero : gap;
+        Changed?.Invoke();
+    }
+
     public int IndexOf(Clip clip) => _clips.IndexOf(clip);
 
     public Clip? FindById(Guid id)
@@ -76,6 +82,7 @@ public sealed class Timeline
         var start = TimeSpan.Zero;
         foreach (var current in _clips)
         {
+            start += current.LeadingGap;
             if (ReferenceEquals(current, clip))
             {
                 return start;
@@ -87,9 +94,43 @@ public sealed class Timeline
         return TimeSpan.Zero;
     }
 
+    public TimeSpan StartOf(int index)
+    {
+        var start = TimeSpan.Zero;
+        for (var i = 0; i < _clips.Count; i++)
+        {
+            start += _clips[i].LeadingGap;
+            if (i == index)
+            {
+                return start;
+            }
+
+            start += _clips[i].Duration;
+        }
+
+        return start;
+    }
+
+    public TimeSpan NextClipStart(TimeSpan global)
+    {
+        var start = TimeSpan.Zero;
+        foreach (var clip in _clips)
+        {
+            start += clip.LeadingGap;
+            if (start >= global)
+            {
+                return start;
+            }
+
+            start += clip.Duration;
+        }
+
+        return start;
+    }
+
     public TimelineLocation? Resolve(TimeSpan global)
     {
-        if (global < TimeSpan.Zero || global >= TotalDuration)
+        if (global < TimeSpan.Zero)
         {
             return null;
         }
@@ -98,6 +139,13 @@ public sealed class Timeline
         for (var i = 0; i < _clips.Count; i++)
         {
             var clip = _clips[i];
+            start += clip.LeadingGap;
+
+            if (global < start)
+            {
+                return null;
+            }
+
             var end = start + clip.Duration;
             if (global < end)
             {

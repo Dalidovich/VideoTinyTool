@@ -19,6 +19,7 @@ public enum EditorCommand
     TrimOut,
     Split,
     Delete,
+    RippleDelete,
     Undo,
     Redo,
     Import,
@@ -50,6 +51,7 @@ public static class Shortcuts
             {
                 Keyboard.Key.Left => EditorCommand.StepSecondBack,
                 Keyboard.Key.Right => EditorCommand.StepSecondForward,
+                Keyboard.Key.Delete => EditorCommand.RippleDelete,
                 Keyboard.Key.Equal => EditorCommand.ZoomIn,
                 _ => EditorCommand.None
             };

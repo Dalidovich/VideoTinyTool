@@ -21,8 +21,9 @@ public sealed class Clip
     public Guid SourceId { get; }
     public TimeSpan In { get; internal set; }
     public TimeSpan Out { get; internal set; }
+    public TimeSpan LeadingGap { get; internal set; }
 
     public TimeSpan Duration => Out - In;
 
-    public Clip WithBounds(TimeSpan @in, TimeSpan @out) => new(Id, SourceId, @in, @out);
+    public Clip WithBounds(TimeSpan @in, TimeSpan @out) => new(Id, SourceId, @in, @out) { LeadingGap = LeadingGap };
 }

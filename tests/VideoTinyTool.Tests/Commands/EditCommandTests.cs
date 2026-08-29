@@ -6,7 +6,10 @@ namespace VideoTinyTool.Tests.Commands;
 public class EditCommandTests
 {
     private static string Snapshot(Timeline timeline) =>
-        string.Join("|", timeline.Clips.Select(clip => $"{clip.Id}:{clip.In}:{clip.Out}"));
+        string.Join("|", timeline.Clips.Select(clip => $"{clip.Id}:{clip.In}:{clip.Out}:{clip.LeadingGap}"));
+
+    private static string Starts(Timeline timeline) =>
+        string.Join("|", timeline.Clips.Select(clip => timeline.StartOf(clip).ToString()));
 
     [Fact]
     public void AddClip_ExecuteThenUndo_RestoresTheTimeline()
@@ -39,7 +42,7 @@ public class EditCommandTests
     {
         var (timeline, _, _, b, _) = TestData.ThreeClipTimeline();
         var before = Snapshot(timeline);
-        var command = new RemoveClipCommand(b);
+        var command = new RemoveClipCommand(b, ripple: false);
 
         command.Execute(timeline);
         Assert.Equal(2, timeline.Clips.Count);
@@ -48,6 +51,108 @@ public class EditCommandTests
         command.Undo(timeline);
         Assert.Equal(before, Snapshot(timeline));
         Assert.Equal(1, timeline.IndexOf(b));
+    }
+
+    [Fact]
+    public void RemoveClip_LeavesAGapSoTheLaterClipsKeepTheirStart()
+    {
+        var (timeline, _, a, _, c) = TestData.ThreeClipTimeline();
+        var totalBefore = timeline.TotalDuration;
+
+        new RemoveClipCommand(a, ripple: false).Execute(timeline);
+
+        Assert.Equal(TimeSpan.FromSeconds(4), timeline.StartOf(timeline.Clips[0]));
+        Assert.Equal(TimeSpan.FromSeconds(10), timeline.StartOf(c));
+        Assert.Equal(totalBefore, timeline.TotalDuration);
+    }
+
+    [Fact]
+    public void RemoveClip_OfTheLastClip_ShortensTheTimeline()
+    {
+        var (timeline, _, _, b, c) = TestData.ThreeClipTimeline();
+
+        new RemoveClipCommand(c, ripple: false).Execute(timeline);
+
+        Assert.Equal(TimeSpan.FromSeconds(10), timeline.TotalDuration);
+        Assert.Equal(TimeSpan.FromSeconds(4), timeline.StartOf(b));
+    }
+
+    [Fact]
+    public void RemoveClip_ThenUndo_RestoresEveryStart()
+    {
+        var (timeline, _, a, _, _) = TestData.ThreeClipTimeline();
+        var before = Starts(timeline);
+        var command = new RemoveClipCommand(a, ripple: false);
+
+        command.Execute(timeline);
+        command.Undo(timeline);
+
+        Assert.Equal(before, Starts(timeline));
+    }
+
+    [Fact]
+    public void RippleDeleteClip_PullsTheLaterClipsLeft()
+    {
+        var (timeline, _, a, b, c) = TestData.ThreeClipTimeline();
+
+        new RemoveClipCommand(a, ripple: true).Execute(timeline);
+
+        Assert.Equal(TimeSpan.Zero, timeline.StartOf(b));
+        Assert.Equal(TimeSpan.FromSeconds(6), timeline.StartOf(c));
+        Assert.Equal(TimeSpan.FromSeconds(8), timeline.TotalDuration);
+    }
+
+    [Fact]
+    public void RippleDeleteClip_KeepsAnEarlierGapInPlace()
+    {
+        var (timeline, _, a, b, c) = TestData.ThreeClipTimeline();
+        timeline.SetLeadingGap(b, TimeSpan.FromSeconds(3));
+
+        new RemoveClipCommand(b, ripple: true).Execute(timeline);
+
+        Assert.Equal(TimeSpan.Zero, timeline.StartOf(a));
+        Assert.Equal(TimeSpan.FromSeconds(7), timeline.StartOf(c));
+    }
+
+    [Fact]
+    public void RippleDeleteClip_ThenUndo_RestoresEveryStart()
+    {
+        var (timeline, _, a, b, _) = TestData.ThreeClipTimeline();
+        timeline.SetLeadingGap(b, TimeSpan.FromSeconds(3));
+        var before = Starts(timeline);
+        var command = new RemoveClipCommand(a, ripple: true);
+
+        command.Execute(timeline);
+        command.Undo(timeline);
+
+        Assert.Equal(before, Starts(timeline));
+    }
+
+    [Fact]
+    public void SplitClip_InsideAGappedClip_KeepsTheStartOfBothHalves()
+    {
+        var (timeline, _, _, b, _) = TestData.ThreeClipTimeline();
+        timeline.SetLeadingGap(b, TimeSpan.FromSeconds(3));
+        var command = new SplitClipCommand(b, TimeSpan.FromSeconds(13));
+
+        command.Execute(timeline);
+
+        Assert.Equal(TimeSpan.FromSeconds(7), timeline.StartOf(command.Left));
+        Assert.Equal(TimeSpan.FromSeconds(10), timeline.StartOf(command.Right));
+    }
+
+    [Fact]
+    public void SplitClip_InsideAGappedClip_ThenUndo_RestoresTheGap()
+    {
+        var (timeline, _, _, b, _) = TestData.ThreeClipTimeline();
+        timeline.SetLeadingGap(b, TimeSpan.FromSeconds(3));
+        var before = Snapshot(timeline);
+        var command = new SplitClipCommand(b, TimeSpan.FromSeconds(13));
+
+        command.Execute(timeline);
+        command.Undo(timeline);
+
+        Assert.Equal(before, Snapshot(timeline));
     }
 
     [Fact]

@@ -95,6 +95,105 @@ public class TimelineTests
     }
 
     [Fact]
+    public void TotalDuration_CountsLeadingGaps()
+    {
+        var (timeline, _, _, b, _) = TestData.ThreeClipTimeline();
+
+        timeline.SetLeadingGap(b, TimeSpan.FromSeconds(3));
+
+        Assert.Equal(TimeSpan.FromSeconds(15), timeline.TotalDuration);
+    }
+
+    [Fact]
+    public void StartOf_CountsTheLeadingGap()
+    {
+        var (timeline, _, a, b, c) = TestData.ThreeClipTimeline();
+
+        timeline.SetLeadingGap(b, TimeSpan.FromSeconds(3));
+
+        Assert.Equal(TimeSpan.Zero, timeline.StartOf(a));
+        Assert.Equal(TimeSpan.FromSeconds(7), timeline.StartOf(b));
+        Assert.Equal(TimeSpan.FromSeconds(13), timeline.StartOf(c));
+    }
+
+    [Fact]
+    public void StartOf_ByIndex_MatchesStartOfByClip()
+    {
+        var (timeline, _, _, b, _) = TestData.ThreeClipTimeline();
+
+        timeline.SetLeadingGap(b, TimeSpan.FromSeconds(3));
+
+        Assert.Equal(timeline.StartOf(b), timeline.StartOf(1));
+    }
+
+    [Fact]
+    public void StartOf_PastTheLastIndex_IsTheTotalDuration()
+    {
+        var (timeline, _, _, _, _) = TestData.ThreeClipTimeline();
+
+        Assert.Equal(timeline.TotalDuration, timeline.StartOf(timeline.Clips.Count));
+    }
+
+    [Fact]
+    public void Resolve_InsideAGap_ReturnsNull()
+    {
+        var (timeline, _, _, b, _) = TestData.ThreeClipTimeline();
+
+        timeline.SetLeadingGap(b, TimeSpan.FromSeconds(3));
+
+        Assert.Null(timeline.Resolve(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public void Resolve_AfterAGap_MapsToTheClipThatFollowsIt()
+    {
+        var (timeline, _, _, b, _) = TestData.ThreeClipTimeline();
+
+        timeline.SetLeadingGap(b, TimeSpan.FromSeconds(3));
+        var location = timeline.Resolve(TimeSpan.FromSeconds(9));
+
+        Assert.NotNull(location);
+        Assert.Same(b, location!.Value.Clip);
+        Assert.Equal(TimeSpan.FromSeconds(12), location.Value.SourceOffset);
+    }
+
+    [Fact]
+    public void NextClipStart_InsideAGap_IsTheStartOfTheClipAfterIt()
+    {
+        var (timeline, _, _, b, _) = TestData.ThreeClipTimeline();
+
+        timeline.SetLeadingGap(b, TimeSpan.FromSeconds(3));
+
+        Assert.Equal(TimeSpan.FromSeconds(7), timeline.NextClipStart(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public void NextClipStart_OnAClipBoundary_IsThatBoundary()
+    {
+        var (timeline, _, _, _, _) = TestData.ThreeClipTimeline();
+
+        Assert.Equal(TimeSpan.FromSeconds(4), timeline.NextClipStart(TimeSpan.FromSeconds(4)));
+    }
+
+    [Fact]
+    public void NextClipStart_PastTheLastClip_IsTheTotalDuration()
+    {
+        var (timeline, _, _, _, _) = TestData.ThreeClipTimeline();
+
+        Assert.Equal(timeline.TotalDuration, timeline.NextClipStart(TimeSpan.FromSeconds(12)));
+    }
+
+    [Fact]
+    public void SetLeadingGap_RejectsANegativeGap()
+    {
+        var (timeline, _, _, b, _) = TestData.ThreeClipTimeline();
+
+        timeline.SetLeadingGap(b, TimeSpan.FromSeconds(-2));
+
+        Assert.Equal(TimeSpan.Zero, b.LeadingGap);
+    }
+
+    [Fact]
     public void Clip_RejectsAnOutThatIsNotAfterIn()
     {
         var sourceId = Guid.NewGuid();

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.Versioning;
 using SFML.Graphics;
 using SFML.System;
@@ -331,6 +331,10 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
             case EditorCommand.Delete:
                 RemoveSelectedClip();
+                break;
+
+            case EditorCommand.RippleDelete:
+                RippleDeleteSelectedClip();
                 break;
 
             case EditorCommand.Undo:
@@ -674,7 +678,11 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         _selectedClip = command.Right;
     }
 
-    public void RemoveSelectedClip()
+    public void RemoveSelectedClip() => RemoveSelectedClip(ripple: false);
+
+    public void RippleDeleteSelectedClip() => RemoveSelectedClip(ripple: true);
+
+    private void RemoveSelectedClip(bool ripple)
     {
         var clip = _selectedClip;
         if (clip is null)
@@ -683,7 +691,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         }
 
         var index = _timeline.IndexOf(clip);
-        Execute(new RemoveClipCommand(clip));
+        Execute(new RemoveClipCommand(clip, ripple));
 
         _selectedClip = _timeline.Clips.Count == 0
             ? null

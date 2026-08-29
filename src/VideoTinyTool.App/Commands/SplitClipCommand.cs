@@ -31,6 +31,7 @@ public sealed class SplitClipCommand : IEditCommand
             return;
         }
 
+        timeline.SetLeadingGap(_left, _original.LeadingGap);
         timeline.RemoveAt(_index);
         timeline.Insert(_index, _right);
         timeline.Insert(_index, _left);

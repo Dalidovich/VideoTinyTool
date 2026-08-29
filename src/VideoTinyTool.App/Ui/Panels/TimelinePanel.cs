@@ -150,6 +150,7 @@ public sealed class TimelinePanel : PanelBase
         var start = TimeSpan.Zero;
         foreach (var clip in _host.Timeline.Clips)
         {
+            start += clip.LeadingGap;
             DrawClip(renderer, clip, start);
             start += clip.Duration;
         }
@@ -277,14 +278,7 @@ public sealed class TimelinePanel : PanelBase
     private void DrawInsertionMarker(Renderer renderer)
     {
         var lane = LaneBounds;
-        var time = TimeSpan.Zero;
-
-        for (var i = 0; i < _dragToIndex && i < _host.Timeline.Clips.Count; i++)
-        {
-            time += _host.Timeline.Clips[i].Duration;
-        }
-
-        var x = MathF.Round(TimeToX(time));
+        var x = MathF.Round(TimeToX(_host.Timeline.StartOf(_dragToIndex)));
         renderer.FillRect(x - 1, lane.Top + 4, 2, lane.Height - 8, Theme.Accent);
     }
 
@@ -415,6 +409,8 @@ public sealed class TimelinePanel : PanelBase
         for (var i = 0; i < _host.Timeline.Clips.Count; i++)
         {
             var clip = _host.Timeline.Clips[i];
+            start += clip.LeadingGap;
+
             var left = TimeToX(start);
             var right = TimeToX(start + clip.Duration);
 
@@ -568,6 +564,8 @@ public sealed class TimelinePanel : PanelBase
 
         for (var i = 0; i < clips.Count; i++)
         {
+            start += clips[i].LeadingGap;
+
             var left = TimeToX(start);
             var right = TimeToX(start + clips[i].Duration);
 
