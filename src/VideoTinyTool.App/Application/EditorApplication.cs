@@ -70,6 +70,8 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             Styles.Default,
             State.Windowed);
 
+        WindowIcon.Apply(_window.NativeHandle);
+
         _window.SetFramerateLimit(60);
         _window.SetMinimumSize(new Vector2u(
             (uint)LayoutCalculator.MinimumWindowWidth,
