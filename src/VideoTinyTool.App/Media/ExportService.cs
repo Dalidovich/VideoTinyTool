@@ -27,7 +27,15 @@ public sealed class ExportService : IDisposable
 
     public event Action<ExportResult>? Finished;
 
-    public void Start(IReadOnlyList<ExportItem> items, ExportSettings export, string outputPath, TimeSpan totalDuration)
+    public void Start(IReadOnlyList<ExportItem> items, ExportSettings export, string outputPath, TimeSpan totalDuration) =>
+        Start(items, [], export, outputPath, totalDuration);
+
+    public void Start(
+        IReadOnlyList<ExportItem> items,
+        IReadOnlyList<OverlayItem> overlays,
+        ExportSettings export,
+        string outputPath,
+        TimeSpan totalDuration)
     {
         lock (_gate)
         {
@@ -42,7 +50,7 @@ public sealed class ExportService : IDisposable
             CurrentOutputPath = outputPath;
         }
 
-        var arguments = FFmpegArgumentBuilder.Build(items, export, outputPath);
+        var arguments = FFmpegArgumentBuilder.Build(items, overlays, export, outputPath);
 
         _worker = new Thread(() => Run(arguments, outputPath, totalDuration))
         {

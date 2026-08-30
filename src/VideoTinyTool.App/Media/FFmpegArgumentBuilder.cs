@@ -14,6 +14,19 @@ public readonly record struct ExportItem(string SourcePath, TimeSpan In, TimeSpa
     public TimeSpan Duration => Out - In;
 }
 
+public readonly record struct OverlayItem(
+    string SourcePath,
+    TimeSpan In,
+    TimeSpan Out,
+    bool HasAudio,
+    TimeSpan Start,
+    OverlayTransform Transform)
+{
+    public TimeSpan Duration => Out - In;
+
+    public bool HasSound => HasAudio && Transform.Volume > 0f;
+}
+
 public static class FFmpegArgumentBuilder
 {
     public static IReadOnlyList<ExportItem> BuildItems(Timeline timeline, IReadOnlyDictionary<Guid, MediaSource> sources)
@@ -37,7 +50,37 @@ public static class FFmpegArgumentBuilder
         return items;
     }
 
-    public static string Build(IReadOnlyList<ExportItem> items, ExportSettings export, string outputPath)
+    public static IReadOnlyList<OverlayItem> BuildOverlayItems(Timeline timeline, IReadOnlyDictionary<Guid, MediaSource> sources)
+    {
+        var items = new List<OverlayItem>();
+
+        for (var trackIndex = 1; trackIndex < timeline.Tracks.Count; trackIndex++)
+        {
+            var start = TimeSpan.Zero;
+            foreach (var clip in timeline.Tracks[trackIndex].Clips)
+            {
+                start += clip.LeadingGap;
+
+                if (sources.TryGetValue(clip.SourceId, out var source))
+                {
+                    items.Add(new OverlayItem(source.Path, clip.In, clip.Out, source.HasAudio, start, clip.Overlay));
+                }
+
+                start += clip.Duration;
+            }
+        }
+
+        return items;
+    }
+
+    public static string Build(IReadOnlyList<ExportItem> items, ExportSettings export, string outputPath) =>
+        Build(items, [], export, outputPath);
+
+    public static string Build(
+        IReadOnlyList<ExportItem> items,
+        IReadOnlyList<OverlayItem> overlays,
+        ExportSettings export,
+        string outputPath)
     {
         if (items.Count == 0)
         {
@@ -59,8 +102,16 @@ public static class FFmpegArgumentBuilder
             args.Append(" -i ").Append(Quote(item.SourcePath));
         }
 
-        args.Append(" -filter_complex ").Append(Quote(BuildFilterGraph(items, export)));
-        args.Append(" -map \"[v]\" -map \"[a]\"");
+        foreach (var overlay in overlays)
+        {
+            args.Append(" -ss ").Append(Seconds(overlay.In));
+            args.Append(" -t ").Append(Seconds(overlay.Duration));
+            args.Append(" -i ").Append(Quote(overlay.SourcePath));
+        }
+
+        args.Append(" -filter_complex ").Append(Quote(BuildFilterGraph(items, overlays, export)));
+        args.Append(" -map ").Append(Quote(VideoLabel(overlays)));
+        args.Append(" -map ").Append(Quote(AudioLabel(overlays)));
         args.Append(" -c:v ").Append(export.VideoCodec);
         args.Append(" -crf ").Append(export.Crf.ToString(CultureInfo.InvariantCulture));
         args.Append(" -preset ").Append(export.Preset);
@@ -72,7 +123,13 @@ public static class FFmpegArgumentBuilder
         return args.ToString();
     }
 
-    public static string BuildFilterGraph(IReadOnlyList<ExportItem> items, ExportSettings export)
+    public static string BuildFilterGraph(IReadOnlyList<ExportItem> items, ExportSettings export) =>
+        BuildFilterGraph(items, [], export);
+
+    public static string BuildFilterGraph(
+        IReadOnlyList<ExportItem> items,
+        IReadOnlyList<OverlayItem> overlays,
+        ExportSettings export)
     {
         var width = export.Width.ToString(CultureInfo.InvariantCulture);
         var height = export.Height.ToString(CultureInfo.InvariantCulture);
@@ -129,8 +186,124 @@ public static class FFmpegArgumentBuilder
         graph.Append(concat);
         graph.Append("concat=n=").Append(items.Count.ToString(CultureInfo.InvariantCulture)).Append(":v=1:a=1[v][a]");
 
+        AppendOverlays(graph, items, overlays, export);
+
         return graph.ToString();
     }
+
+    private static void AppendOverlays(
+        StringBuilder graph,
+        IReadOnlyList<ExportItem> items,
+        IReadOnlyList<OverlayItem> overlays,
+        ExportSettings export)
+    {
+        if (overlays.Count == 0)
+        {
+            return;
+        }
+
+        var fps = export.FrameRate.ToString(CultureInfo.InvariantCulture);
+        var input = 0;
+        foreach (var item in items)
+        {
+            if (!item.IsGap)
+            {
+                input++;
+            }
+        }
+
+        var accumulated = "[v]";
+
+        for (var k = 0; k < overlays.Count; k++)
+        {
+            var transform = overlays[k].Transform;
+
+            graph.Append(";[").Append(input + k).Append(":v]");
+            graph.Append("scale=").Append(EvenWidth(export.Width, transform.Width)).Append(":-2,");
+            graph.Append("setsar=1,fps=").Append(fps).Append(",format=yuva420p,");
+            graph.Append("colorchannelmixer=aa=").Append(Number(transform.Opacity)).Append(',');
+            graph.Append("setpts=PTS-STARTPTS+").Append(Seconds(overlays[k].Start)).Append("/TB");
+            graph.Append("[ov").Append(k).Append("];");
+
+            graph.Append(accumulated).Append("[ov").Append(k).Append(']');
+            graph.Append("overlay=x=").Append(Coordinate(export.Width, transform.X));
+            graph.Append(":y=").Append(Coordinate(export.Height, transform.Y));
+            graph.Append(":eof_action=pass:shortest=0");
+            graph.Append("[acc").Append(k).Append(']');
+
+            accumulated = "[acc" + k.ToString(CultureInfo.InvariantCulture) + "]";
+        }
+
+        var mix = new StringBuilder();
+        var mixInputs = 1;
+
+        for (var k = 0; k < overlays.Count; k++)
+        {
+            if (!overlays[k].HasSound)
+            {
+                continue;
+            }
+
+            var delay = Milliseconds(overlays[k].Start);
+
+            graph.Append(";[").Append(input + k).Append(":a]");
+            graph.Append("aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,");
+            graph.Append("volume=").Append(Number(overlays[k].Transform.Volume)).Append(',');
+            graph.Append("adelay=").Append(delay).Append('|').Append(delay);
+            graph.Append("[oa").Append(k).Append(']');
+
+            mix.Append("[oa").Append(k).Append(']');
+            mixInputs++;
+        }
+
+        if (mixInputs == 1)
+        {
+            return;
+        }
+
+        graph.Append(";[a]").Append(mix);
+        graph.Append("amix=inputs=").Append(mixInputs.ToString(CultureInfo.InvariantCulture));
+        graph.Append(":normalize=0:dropout_transition=0[amixed]");
+    }
+
+    private static string VideoLabel(IReadOnlyList<OverlayItem> overlays) =>
+        overlays.Count == 0
+            ? "[v]"
+            : "[acc" + (overlays.Count - 1).ToString(CultureInfo.InvariantCulture) + "]";
+
+    private static string AudioLabel(IReadOnlyList<OverlayItem> overlays)
+    {
+        foreach (var overlay in overlays)
+        {
+            if (overlay.HasSound)
+            {
+                return "[amixed]";
+            }
+        }
+
+        return "[a]";
+    }
+
+    private static string EvenWidth(int exportWidth, float fraction)
+    {
+        var width = (int)Math.Round(exportWidth * (double)fraction, MidpointRounding.AwayFromZero);
+        if (width % 2 != 0)
+        {
+            width++;
+        }
+
+        return Math.Max(2, width).ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static string Coordinate(int extent, float fraction) =>
+        ((int)Math.Round(extent * (double)fraction, MidpointRounding.AwayFromZero))
+            .ToString(CultureInfo.InvariantCulture);
+
+    private static string Milliseconds(TimeSpan value) =>
+        ((long)Math.Round(value.TotalMilliseconds, MidpointRounding.AwayFromZero))
+            .ToString(CultureInfo.InvariantCulture);
+
+    private static string Number(float value) => value.ToString("0.###", CultureInfo.InvariantCulture);
 
     public static string Seconds(TimeSpan value) =>
         value.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture);

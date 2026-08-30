@@ -1,3 +1,4 @@
+﻿using System.Globalization;
 using VideoTinyTool.Application;
 using VideoTinyTool.Domain;
 using VideoTinyTool.Media;
@@ -21,6 +22,21 @@ public class FFmpegArgumentBuilderTests
 
     private static ExportItem Item(string path, double inSeconds, double outSeconds, bool hasAudio = true) =>
         new(path, TimeSpan.FromSeconds(inSeconds), TimeSpan.FromSeconds(outSeconds), hasAudio);
+
+    private static OverlayItem Overlay(
+        string path,
+        double inSeconds,
+        double outSeconds,
+        double startSeconds,
+        OverlayTransform transform,
+        bool hasAudio = false) =>
+        new(
+            path,
+            TimeSpan.FromSeconds(inSeconds),
+            TimeSpan.FromSeconds(outSeconds),
+            hasAudio,
+            TimeSpan.FromSeconds(startSeconds),
+            transform);
 
     [Fact]
     public void SingleClip_PutsSeekAndDurationBeforeTheInput()
@@ -186,5 +202,227 @@ public class FFmpegArgumentBuilderTests
             @"C:\out\r.mp4");
 
         Assert.Contains("-ss 1.25 -t 2.25", args);
+    }
+
+    [Fact]
+    public void NoOverlays_LeavesTheBaseGraphByteIdentical()
+    {
+        var items = new[]
+        {
+            Item(@"C:\media\a.mp4", 0, 4),
+            ExportItem.Gap(TimeSpan.FromSeconds(2)),
+            Item(@"C:\media\b.mp4", 1, 3, hasAudio: false)
+        };
+
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(items, [], Settings());
+
+        Assert.Equal(
+            "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease," +
+            "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v0];" +
+            "[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];" +
+            "color=c=black:s=1920x1080:r=30:d=2,setsar=1,format=yuv420p[v1];" +
+            "anullsrc=channel_layout=stereo:sample_rate=48000:d=2," +
+            "aformat=sample_fmts=fltp:channel_layouts=stereo[a1];" +
+            "[1:v]scale=1920:1080:force_original_aspect_ratio=decrease," +
+            "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v2];" +
+            "anullsrc=channel_layout=stereo:sample_rate=48000:d=2," +
+            "aformat=sample_fmts=fltp:channel_layouts=stereo[a2];" +
+            "[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[v][a]",
+            graph);
+
+        Assert.Equal(FFmpegArgumentBuilder.BuildFilterGraph(items, Settings()), graph);
+    }
+
+    [Fact]
+    public void SingleOverlay_ScalesShiftsAndCompositesOntoTheBaseVideo()
+    {
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(
+            [Item(@"C:\media\a.mp4", 0, 10)],
+            [Overlay(@"C:\media\pip.mp4", 0, 3, 2, OverlayTransform.Default)],
+            Settings());
+
+        Assert.EndsWith(
+            "[v0][a0]concat=n=1:v=1:a=1[v][a];" +
+            "[1:v]scale=614:-2,setsar=1,fps=30,format=yuva420p,colorchannelmixer=aa=1," +
+            "setpts=PTS-STARTPTS+2/TB[ov0];" +
+            "[v][ov0]overlay=x=1190:y=65:eof_action=pass:shortest=0[acc0]",
+            graph);
+    }
+
+    [Fact]
+    public void SingleOverlay_IsInputAfterEveryBaseInputAndBecomesTheMappedVideo()
+    {
+        var args = FFmpegArgumentBuilder.Build(
+            [Item(@"C:\media\a.mp4", 0, 10), ExportItem.Gap(TimeSpan.FromSeconds(1)), Item(@"C:\media\b.mp4", 0, 5)],
+            [Overlay(@"C:\media\pip.mp4", 1, 4, 2, OverlayTransform.Default)],
+            Settings(),
+            @"C:\out\r.mp4");
+
+        Assert.Equal(3, args.Split(" -i ").Length - 1);
+        Assert.Contains(@"-ss 0 -t 5 -i ""C:\media\b.mp4"" -ss 1 -t 3 -i ""C:\media\pip.mp4""", args);
+        Assert.Contains("[2:v]scale=614:-2", args);
+        Assert.Contains("-map \"[acc0]\" -map \"[a]\"", args);
+    }
+
+    [Fact]
+    public void TwoOverlays_ChainInTrackOrder()
+    {
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(
+            [Item(@"C:\media\a.mp4", 0, 10)],
+            [
+                Overlay(@"C:\media\one.mp4", 0, 3, 0, new OverlayTransform(0f, 0f, 0.25f, 1f, 0f)),
+                Overlay(@"C:\media\two.mp4", 0, 3, 4, new OverlayTransform(0.5f, 0.5f, 0.5f, 0.5f, 0f))
+            ],
+            Settings());
+
+        Assert.EndsWith(
+            "[1:v]scale=480:-2,setsar=1,fps=30,format=yuva420p,colorchannelmixer=aa=1," +
+            "setpts=PTS-STARTPTS+0/TB[ov0];" +
+            "[v][ov0]overlay=x=0:y=0:eof_action=pass:shortest=0[acc0];" +
+            "[2:v]scale=960:-2,setsar=1,fps=30,format=yuva420p,colorchannelmixer=aa=0.5," +
+            "setpts=PTS-STARTPTS+4/TB[ov1];" +
+            "[acc0][ov1]overlay=x=960:y=540:eof_action=pass:shortest=0[acc1]",
+            graph);
+    }
+
+    [Fact]
+    public void OverlayWithAudio_IsDelayedAndMixedIntoTheBaseAudio()
+    {
+        var overlays = new[]
+        {
+            Overlay(@"C:\media\pip.mp4", 0, 3, 1.25, new OverlayTransform(0f, 0f, 0.25f, 1f, 0.5f), hasAudio: true)
+        };
+
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph([Item(@"C:\media\a.mp4", 0, 10)], overlays, Settings());
+        var args = FFmpegArgumentBuilder.Build([Item(@"C:\media\a.mp4", 0, 10)], overlays, Settings(), @"C:\out\r.mp4");
+
+        Assert.EndsWith(
+            "[1:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo," +
+            "volume=0.5,adelay=1250|1250[oa0];" +
+            "[a][oa0]amix=inputs=2:normalize=0:dropout_transition=0[amixed]",
+            graph);
+        Assert.Contains("-map \"[acc0]\" -map \"[amixed]\"", args);
+    }
+
+    [Fact]
+    public void TwoOverlaysWithAudio_MixThreeInputs()
+    {
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(
+            [Item(@"C:\media\a.mp4", 0, 10)],
+            [
+                Overlay(@"C:\media\one.mp4", 0, 3, 0, OverlayTransform.Default, hasAudio: true),
+                Overlay(@"C:\media\two.mp4", 0, 3, 2, OverlayTransform.Default, hasAudio: true)
+            ],
+            Settings());
+
+        Assert.Contains("adelay=0|0[oa0]", graph);
+        Assert.Contains("adelay=2000|2000[oa1]", graph);
+        Assert.EndsWith("[a][oa0][oa1]amix=inputs=3:normalize=0:dropout_transition=0[amixed]", graph);
+    }
+
+    [Fact]
+    public void MutedOverlay_ContributesNoAudio()
+    {
+        var overlays = new[]
+        {
+            Overlay(@"C:\media\pip.mp4", 0, 3, 1, new OverlayTransform(0f, 0f, 0.25f, 1f, 0f), hasAudio: true)
+        };
+
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph([Item(@"C:\media\a.mp4", 0, 10)], overlays, Settings());
+        var args = FFmpegArgumentBuilder.Build([Item(@"C:\media\a.mp4", 0, 10)], overlays, Settings(), @"C:\out\r.mp4");
+
+        Assert.DoesNotContain("amix", graph);
+        Assert.DoesNotContain("[oa", graph);
+        Assert.Contains("-map \"[acc0]\" -map \"[a]\"", args);
+    }
+
+    [Fact]
+    public void OverlayWithoutAudioTrack_ContributesNoAudio()
+    {
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(
+            [Item(@"C:\media\a.mp4", 0, 10)],
+            [Overlay(@"C:\media\pip.mp4", 0, 3, 1, OverlayTransform.Default)],
+            Settings());
+
+        Assert.DoesNotContain("amix", graph);
+        Assert.DoesNotContain("[oa", graph);
+        Assert.DoesNotContain("[1:a]", graph);
+    }
+
+    [Fact]
+    public void OverlayNumbers_UseInvariantFormattingUnderACommaDecimalCulture()
+    {
+        var previous = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("ru-RU");
+
+        try
+        {
+            var graph = FFmpegArgumentBuilder.BuildFilterGraph(
+                [Item(@"C:\media\a.mp4", 0, 10)],
+                [Overlay(@"C:\media\pip.mp4", 0, 3, 1.5, new OverlayTransform(0f, 0f, 0.25f, 0.5f, 0.25f), hasAudio: true)],
+                Settings());
+
+            Assert.Contains("scale=480:-2", graph);
+            Assert.Contains("colorchannelmixer=aa=0.5", graph);
+            Assert.Contains("setpts=PTS-STARTPTS+1.5/TB", graph);
+            Assert.Contains("volume=0.25,adelay=1500|1500[oa0]", graph);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
+    }
+
+    [Fact]
+    public void BuildOverlayItems_SkipsTheBaseTrackAndOrdersByTrackThenStart()
+    {
+        var source = TestData.Source();
+        var sources = new Dictionary<Guid, MediaSource> { [source.Id] = source };
+
+        var timeline = new Timeline();
+        timeline.Add(TestData.Clip(source.Id, 0, 10));
+
+        timeline.AddTrack();
+        timeline.AddTrack();
+
+        var first = TestData.Clip(source.Id, 0, 2);
+        var second = TestData.Clip(source.Id, 5, 8);
+        timeline.Add(1, first);
+        timeline.Add(1, second);
+        timeline.SetLeadingGap(first, TimeSpan.FromSeconds(1));
+
+        var third = TestData.Clip(source.Id, 20, 24);
+        timeline.Add(2, third);
+        timeline.SetLeadingGap(third, TimeSpan.FromSeconds(4));
+        timeline.SetOverlay(third, new OverlayTransform(0.1f, 0.2f, 0.3f, 0.4f, 0.5f));
+
+        var overlays = FFmpegArgumentBuilder.BuildOverlayItems(timeline, sources);
+
+        Assert.Equal(3, overlays.Count);
+        Assert.Equal(TimeSpan.FromSeconds(1), overlays[0].Start);
+        Assert.Equal(TimeSpan.FromSeconds(3), overlays[1].Start);
+        Assert.Equal(TimeSpan.FromSeconds(4), overlays[2].Start);
+        Assert.Equal(TimeSpan.FromSeconds(20), overlays[2].In);
+        Assert.Equal(new OverlayTransform(0.1f, 0.2f, 0.3f, 0.4f, 0.5f), overlays[2].Transform);
+        Assert.True(overlays[0].HasAudio);
+    }
+
+    [Fact]
+    public void BuildOverlayItems_SkipsClipsWithoutASourceButKeepsLaterPositions()
+    {
+        var source = TestData.Source();
+        var sources = new Dictionary<Guid, MediaSource> { [source.Id] = source };
+
+        var timeline = new Timeline();
+        timeline.Add(TestData.Clip(source.Id, 0, 10));
+        timeline.AddTrack();
+
+        timeline.Add(1, TestData.Clip(Guid.NewGuid(), 0, 3));
+        timeline.Add(1, TestData.Clip(source.Id, 0, 2));
+
+        var overlays = FFmpegArgumentBuilder.BuildOverlayItems(timeline, sources);
+
+        Assert.Single(overlays);
+        Assert.Equal(TimeSpan.FromSeconds(3), overlays[0].Start);
     }
 }

@@ -707,11 +707,13 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             return;
         }
 
+        var overlays = FFmpegArgumentBuilder.BuildOverlayItems(_timeline, _sourceIndex);
+
         _progressDialog = new ProgressDialog(I18n.Dialogs.ExportingTitle, path);
         _progressDialog.AddButton(I18n.Dialogs.Cancel, ButtonStyle.Normal, () => _export.Cancel());
         ShowDialog(_progressDialog);
 
-        _export.Start(items, _settings.Export, path, _timeline.TotalDuration);
+        _export.Start(items, overlays, _settings.Export, path, _timeline.TotalDuration);
     }
 
     public void SplitAtPlayhead()
