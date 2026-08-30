@@ -28,6 +28,8 @@ public sealed class ClipPipeline : IDisposable
         ClipIndex = clipIndex;
         GlobalStart = clipGlobalStart;
         SourceOffset = sourceOffset;
+        Width = previewWidth;
+        Height = previewHeight;
         _frameRate = Math.Clamp(source.FrameRate, 1, 120);
 
         _video = new VideoFramePipe(source.Path, sourceOffset, previewWidth, previewHeight, _frameRate);
@@ -49,6 +51,10 @@ public sealed class ClipPipeline : IDisposable
     public TimeSpan GlobalStart { get; }
 
     public TimeSpan SourceOffset { get; }
+
+    public int Width { get; }
+
+    public int Height { get; }
 
     public PcmRingBuffer? Ring { get; }
 

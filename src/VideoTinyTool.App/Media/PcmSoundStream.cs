@@ -12,16 +12,16 @@ public sealed class PcmSoundStream : SoundStream
 
     private long _silenceSamples;
 
-    public PcmSoundStream(PcmRingBuffer ring)
+    public PcmSoundStream(IPcmSource source)
     {
-        Ring = ring;
+        Source = source;
         var samplesPerChunk = AudioPcmPipe.SampleRate * AudioPcmPipe.Channels * ChunkMilliseconds / 1000;
         _samples = new short[samplesPerChunk];
         _bytes = new byte[samplesPerChunk * AudioPcmPipe.BytesPerSample];
         Initialize(AudioPcmPipe.Channels, AudioPcmPipe.SampleRate, [SoundChannel.FrontLeft, SoundChannel.FrontRight]);
     }
 
-    public PcmRingBuffer Ring { get; set; }
+    public IPcmSource Source { get; set; }
 
     public long SilenceSamples => Interlocked.Read(ref _silenceSamples);
 
@@ -29,7 +29,7 @@ public sealed class PcmSoundStream : SoundStream
 
     protected override bool OnGetData(out short[] samples)
     {
-        var read = Ring.Read(_bytes);
+        var read = Source.Read(_bytes);
         if (read < _bytes.Length)
         {
             Array.Clear(_bytes, read, _bytes.Length - read);

@@ -102,18 +102,6 @@ public sealed class PreviewPanel : PanelBase
             return;
         }
 
-        if (_host.Player.InGap)
-        {
-            return;
-        }
-
-        var texture = _host.Player.CurrentTexture;
-        if (texture is null)
-        {
-            renderer.DrawTextCentered(I18n.Preview.PreparingFrame, frame, Theme.FontSizeBody, Theme.TextFaint);
-            return;
-        }
-
         var inner = new FloatRect(
             new Vector2f(frame.Left + 10, frame.Top + 10),
             new Vector2f(Math.Max(1, frame.Width - 20), Math.Max(1, frame.Height - 20)));
@@ -134,7 +122,19 @@ public sealed class PreviewPanel : PanelBase
                 MathF.Round(inner.Top + ((inner.Height - height) / 2f))),
             new Vector2f(MathF.Round(width), MathF.Round(height)));
 
-        renderer.DrawTexture(texture, target);
+        var texture = _host.Player.InGap ? null : _host.Player.CurrentTexture;
+        if (texture is not null)
+        {
+            renderer.DrawTexture(texture, target);
+        }
+
+        DrawOverlays(renderer, target);
+
+        if (texture is null && !_host.Player.InGap && _host.Player.Overlays.Count == 0)
+        {
+            renderer.DrawTextCentered(I18n.Preview.PreparingFrame, frame, Theme.FontSizeBody, Theme.TextFaint);
+            return;
+        }
 
         if (Math.Abs(_host.Player.Rate - 1.0) > 0.001 && _host.Player.IsPlaying)
         {
@@ -149,6 +149,27 @@ public sealed class PreviewPanel : PanelBase
                 Theme.FontSizeLabel,
                 Theme.Accent,
                 TextFont.Mono);
+        }
+    }
+
+    private void DrawOverlays(Renderer renderer, FloatRect video)
+    {
+        foreach (var overlay in _host.Player.Overlays)
+        {
+            var aspect = overlay.SourceAspect <= 0 ? 16.0 / 9.0 : overlay.SourceAspect;
+            var width = video.Width * overlay.Transform.Width;
+            var height = (float)(width / aspect);
+
+            var bounds = new FloatRect(
+                new Vector2f(
+                    MathF.Round(video.Left + (video.Width * overlay.Transform.X)),
+                    MathF.Round(video.Top + (video.Height * overlay.Transform.Y))),
+                new Vector2f(MathF.Round(width), MathF.Round(height)));
+
+            renderer.DrawTexture(
+                overlay.Texture,
+                bounds,
+                new Color(255, 255, 255, (byte)Math.Clamp(overlay.Transform.Opacity * 255f, 0f, 255f)));
         }
     }
 

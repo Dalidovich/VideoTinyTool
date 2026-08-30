@@ -1,8 +1,11 @@
+using SFML.Audio;
 using SFML.Graphics;
 using SFML.System;
 using VideoTinyTool.Domain;
 
 namespace VideoTinyTool.Media;
+
+public readonly record struct OverlayFrame(Texture Texture, OverlayTransform Transform, double SourceAspect);
 
 public sealed class PreviewPlayer : IDisposable
 {
@@ -10,12 +13,18 @@ public sealed class PreviewPlayer : IDisposable
     private static readonly TimeSpan ResumeDelay = TimeSpan.FromMilliseconds(150);
     private static readonly TimeSpan PrimeTimeout = TimeSpan.FromMilliseconds(600);
 
+    private const int MinimumOverlayWidth = 160;
+
     private readonly Timeline _timeline;
     private readonly Func<Guid, MediaSource?> _sourceLookup;
     private readonly StillFrameService _stillFrames;
     private readonly PlaybackClock _clock = new();
     private readonly PcmRingBuffer _silentRing;
     private readonly PcmSoundStream _sound;
+    private readonly PcmMixSource _mixer = new();
+    private readonly List<(IPcmSource Source, float Gain)> _mixInputs = new();
+    private readonly List<OverlayTrackState> _overlayTracks = new();
+    private readonly List<OverlayFrame> _overlayFrames = new();
     private readonly int _previewWidth;
     private readonly int _previewHeight;
     private readonly Texture _liveTexture;
@@ -53,6 +62,8 @@ public sealed class PreviewPlayer : IDisposable
         _silentRing = new PcmRingBuffer(
             AudioPcmPipe.SampleRate * AudioPcmPipe.Channels * AudioPcmPipe.BytesPerSample / 4);
         _sound = new PcmSoundStream(_silentRing);
+
+        SyncOverlayTracks();
     }
 
     public bool IsPlaying { get; private set; }
@@ -64,6 +75,24 @@ public sealed class PreviewPlayer : IDisposable
     public bool InGap => _inGap;
 
     public Texture? CurrentTexture => _inGap ? null : _liveFrameValid ? _liveTexture : _stillTexture;
+
+    public IReadOnlyList<OverlayFrame> Overlays
+    {
+        get
+        {
+            _overlayFrames.Clear();
+            foreach (var track in _overlayTracks)
+            {
+                var texture = track.Texture;
+                if (texture is not null)
+                {
+                    _overlayFrames.Add(new OverlayFrame(texture, track.Transform, track.Aspect));
+                }
+            }
+
+            return _overlayFrames;
+        }
+    }
 
     public TimeSpan Duration => _timeline.TotalDuration;
 
@@ -165,6 +194,7 @@ public sealed class PreviewPlayer : IDisposable
         var wasPlaying = IsPlaying;
 
         Stop(keepPosition: false);
+        SyncOverlayTracks();
         _pausedPosition = position;
 
         if (_timeline.Clips.Count == 0)
@@ -173,6 +203,12 @@ public sealed class PreviewPlayer : IDisposable
             _inGap = false;
             _stillTexture?.Dispose();
             _stillTexture = null;
+
+            foreach (var track in _overlayTracks)
+            {
+                track.ClearFrames();
+            }
+
             return;
         }
 
@@ -182,7 +218,7 @@ public sealed class PreviewPlayer : IDisposable
 
     public void Update()
     {
-        PumpStillFrame();
+        PumpStillFrames();
 
         if (_resumeAt is { } resumeAt && DateTime.UtcNow >= resumeAt)
         {
@@ -205,6 +241,8 @@ public sealed class PreviewPlayer : IDisposable
             RequestStillFrame(Duration - TimeSpan.FromMilliseconds(40));
             return;
         }
+
+        UpdateOverlays(position);
 
         if (_inGap)
         {
@@ -282,13 +320,21 @@ public sealed class PreviewPlayer : IDisposable
         _current ??= CreatePipeline(pipeline.ClipIndex + 1, pipeline.GlobalEnd, IsNormalRate(_rate));
         _current?.Start();
 
-        _sound.Ring = _current?.Ring ?? _silentRing;
+        RefreshAudioMix();
     }
 
     private void EnterGap(TimeSpan from, TimeSpan until)
     {
-        DisposePipelines();
-        SilenceAudio();
+        DisposeBasePipelines();
+
+        if (HasOverlayAudio)
+        {
+            RefreshAudioMix();
+        }
+        else
+        {
+            SilenceAudio();
+        }
 
         _gapEnd = until;
         _inGap = true;
@@ -327,7 +373,7 @@ public sealed class PreviewPlayer : IDisposable
             return;
         }
 
-        DisposePipelines();
+        DisposeBasePipelines();
         _inGap = false;
 
         _current = new ClipPipeline(
@@ -354,8 +400,13 @@ public sealed class PreviewPlayer : IDisposable
         if (withAudio)
         {
             _silentRing.Clear();
-            _sound.Ring = _current.Ring ?? _silentRing;
-            _sound.Play();
+            RefreshAudioMix();
+
+            if (_sound.Status != SoundStatus.Playing)
+            {
+                _sound.Play();
+            }
+
             _audioAnchor = _sound.PlayingOffset.ToTimeSpan();
             _clock.StartAudio(target, () => _sound.PlayingOffset.ToTimeSpan() - _audioAnchor);
         }
@@ -390,6 +441,226 @@ public sealed class PreviewPlayer : IDisposable
             withAudio);
     }
 
+    private void SyncOverlayTracks()
+    {
+        var wanted = _timeline.Tracks.Count - 1;
+
+        while (_overlayTracks.Count > wanted)
+        {
+            var last = _overlayTracks[^1];
+            _overlayTracks.RemoveAt(_overlayTracks.Count - 1);
+            last.Dispose();
+        }
+
+        while (_overlayTracks.Count < wanted)
+        {
+            _overlayTracks.Add(new OverlayTrackState(_overlayTracks.Count + 1));
+        }
+    }
+
+    private void UpdateOverlays(TimeSpan position)
+    {
+        if (_overlayTracks.Count == 0)
+        {
+            return;
+        }
+
+        var withAudio = IsNormalRate(_rate);
+        var rewired = false;
+
+        foreach (var track in _overlayTracks)
+        {
+            rewired |= SyncOverlayPipeline(track, position, withAudio);
+            AdvanceOverlayFrames(track, position);
+            PrefetchOverlay(track, position, withAudio);
+        }
+
+        if (rewired)
+        {
+            RefreshAudioMix();
+        }
+    }
+
+    private bool SyncOverlayPipeline(OverlayTrackState track, TimeSpan position, bool withAudio)
+    {
+        var location = _timeline.Resolve(track.TrackIndex, position);
+
+        if (location is null)
+        {
+            if (track.Current is null)
+            {
+                return false;
+            }
+
+            track.Current.Dispose();
+            track.Current = null;
+            track.ClearFrames();
+            return true;
+        }
+
+        var clip = location.Value.Clip;
+        track.Transform = clip.Overlay;
+
+        if (track.Current is not null && ReferenceEquals(track.Current.Clip, clip))
+        {
+            return false;
+        }
+
+        if (track.Next is not null && ReferenceEquals(track.Next.Clip, clip))
+        {
+            track.Current?.Dispose();
+            track.Current = track.Next;
+            track.Next = null;
+            return true;
+        }
+
+        track.Next?.Dispose();
+        track.Next = null;
+        track.Current?.Dispose();
+        track.Current = CreateOverlayPipeline(clip, location.Value.Index, position, location.Value.SourceOffset, withAudio);
+        track.Current?.Start();
+        return true;
+    }
+
+    private void AdvanceOverlayFrames(OverlayTrackState track, TimeSpan position)
+    {
+        var pipeline = track.Current;
+        if (pipeline is null)
+        {
+            return;
+        }
+
+        var guard = 0;
+        while (guard++ < 8 && pipeline.NextFrameGlobalTime <= position && pipeline.TryTakeFrame(out var frame))
+        {
+            track.EnsureTexture(pipeline.Width, pipeline.Height).Update(frame);
+            track.LiveValid = true;
+            track.Aspect = pipeline.Source.AspectRatio;
+        }
+    }
+
+    private void PrefetchOverlay(OverlayTrackState track, TimeSpan position, bool withAudio)
+    {
+        var pipeline = track.Current;
+        if (pipeline is null || track.Next is not null)
+        {
+            return;
+        }
+
+        if (position < pipeline.GlobalEnd - PrefetchLead)
+        {
+            return;
+        }
+
+        if (_timeline.NextClipStart(track.TrackIndex, pipeline.GlobalEnd) > pipeline.GlobalEnd)
+        {
+            return;
+        }
+
+        var clips = _timeline.ClipsOf(track.TrackIndex);
+        var index = pipeline.ClipIndex + 1;
+        if (index >= clips.Count)
+        {
+            return;
+        }
+
+        track.Next = CreateOverlayPipeline(clips[index], index, pipeline.GlobalEnd, clips[index].In, withAudio);
+        track.Next?.Start();
+    }
+
+    private ClipPipeline? CreateOverlayPipeline(
+        Clip clip,
+        int clipIndex,
+        TimeSpan globalStart,
+        TimeSpan sourceOffset,
+        bool withAudio)
+    {
+        var source = _sourceLookup(clip.SourceId);
+        if (source is null)
+        {
+            return null;
+        }
+
+        var size = OverlaySize(clip.Overlay);
+
+        return new ClipPipeline(
+            clip,
+            source,
+            clipIndex,
+            globalStart,
+            sourceOffset,
+            size.Width,
+            size.Height,
+            withAudio);
+    }
+
+    private (int Width, int Height) OverlaySize(OverlayTransform transform)
+    {
+        var width = Even((int)Math.Round(_previewWidth * (double)transform.Width, MidpointRounding.AwayFromZero));
+        if (width < MinimumOverlayWidth)
+        {
+            width = Even(MinimumOverlayWidth);
+        }
+
+        if (width > _previewWidth)
+        {
+            width = Even(_previewWidth);
+        }
+
+        var height = Even((int)Math.Round(_previewHeight * (double)width / _previewWidth, MidpointRounding.AwayFromZero));
+        return (width, Math.Min(height, Even(_previewHeight)));
+    }
+
+    private static int Even(int value) => value < 2 ? 2 : value % 2 == 0 ? value : value + 1;
+
+    private bool HasOverlayAudio
+    {
+        get
+        {
+            foreach (var track in _overlayTracks)
+            {
+                if (track.Current?.Ring is not null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
+    private void RefreshAudioMix()
+    {
+        _mixInputs.Clear();
+
+        foreach (var track in _overlayTracks)
+        {
+            if (track.Current is { Ring: { } ring } pipeline)
+            {
+                _mixInputs.Add((ring, pipeline.Clip.Overlay.Volume));
+            }
+        }
+
+        if (_mixInputs.Count == 0)
+        {
+            _sound.Source = _current?.Ring ?? _silentRing;
+            return;
+        }
+
+        if (_current?.Ring is { } baseRing)
+        {
+            _mixInputs.Insert(0, (baseRing, 1f));
+        }
+
+        _mixer.SetInputs(_mixInputs);
+        _sound.Source = _mixer;
+
+        if (IsPlaying && IsNormalRate(_rate) && _sound.Status != SoundStatus.Playing)
+        {
+            _sound.Play();
+        }
+    }
+
     private void Stop(bool keepPosition)
     {
         if (IsPlaying && keepPosition)
@@ -416,11 +687,21 @@ public sealed class PreviewPlayer : IDisposable
             // The audio device may already be gone.
         }
 
-        _sound.Ring = _silentRing;
+        _sound.Source = _silentRing;
         _silentRing.Clear();
     }
 
     private void DisposePipelines()
+    {
+        DisposeBasePipelines();
+
+        foreach (var track in _overlayTracks)
+        {
+            track.DisposePipelines();
+        }
+    }
+
+    private void DisposeBasePipelines()
     {
         _current?.Dispose();
         _current = null;
@@ -443,6 +724,8 @@ public sealed class PreviewPlayer : IDisposable
             probe = TimeSpan.Zero;
         }
 
+        RequestOverlayStills(probe);
+
         var location = _timeline.Resolve(probe);
         if (location is null)
         {
@@ -463,26 +746,104 @@ public sealed class PreviewPlayer : IDisposable
         SourceAspect = source.AspectRatio;
     }
 
-    private void PumpStillFrame()
+    private void RequestOverlayStills(TimeSpan probe)
     {
-        var result = _stillFrames.TakeResult();
-        if (result is null || result.Token != _stillToken || result.Png is not { Length: > 0 })
+        foreach (var track in _overlayTracks)
+        {
+            var location = _timeline.Resolve(track.TrackIndex, probe);
+            if (location is null)
+            {
+                track.StillToken = Guid.NewGuid();
+                track.ClearFrames();
+                continue;
+            }
+
+            var source = _sourceLookup(location.Value.Clip.SourceId);
+            if (source is null)
+            {
+                continue;
+            }
+
+            track.Transform = location.Value.Clip.Overlay;
+            track.StillToken = _stillFrames.Request(
+                track.TrackIndex,
+                source,
+                location.Value.SourceOffset,
+                OverlaySize(location.Value.Clip.Overlay).Height);
+        }
+    }
+
+    private void PumpStillFrames()
+    {
+        while (_stillFrames.TakeResult() is { } result)
+        {
+            if (result.Png is not { Length: > 0 })
+            {
+                continue;
+            }
+
+            if (result.Slot == 0)
+            {
+                ApplyBaseStill(result);
+                continue;
+            }
+
+            ApplyOverlayStill(result);
+        }
+    }
+
+    private void ApplyBaseStill(StillFrame result)
+    {
+        if (result.Token != _stillToken)
         {
             return;
         }
 
+        var texture = DecodeStill(result.Png!);
+        if (texture is null)
+        {
+            return;
+        }
+
+        _stillTexture?.Dispose();
+        _stillTexture = texture;
+        SourceAspect = result.Aspect;
+        _liveFrameValid = false;
+    }
+
+    private void ApplyOverlayStill(StillFrame result)
+    {
+        foreach (var track in _overlayTracks)
+        {
+            if (track.TrackIndex != result.Slot || track.StillToken != result.Token)
+            {
+                continue;
+            }
+
+            var texture = DecodeStill(result.Png!);
+            if (texture is null)
+            {
+                return;
+            }
+
+            track.Still?.Dispose();
+            track.Still = texture;
+            track.Aspect = result.Aspect;
+            track.LiveValid = false;
+            return;
+        }
+    }
+
+    private static Texture? DecodeStill(byte[] png)
+    {
         try
         {
-            using var stream = new MemoryStream(result.Png);
-            var texture = new Texture(stream) { Smooth = true };
-            _stillTexture?.Dispose();
-            _stillTexture = texture;
-            SourceAspect = result.Aspect;
-            _liveFrameValid = false;
+            using var stream = new MemoryStream(png);
+            return new Texture(stream) { Smooth = true };
         }
         catch (Exception)
         {
-            // A frame that will not decode is simply skipped.
+            return null;
         }
     }
 
@@ -511,5 +872,77 @@ public sealed class PreviewPlayer : IDisposable
         _sound.Dispose();
         _liveTexture.Dispose();
         _stillTexture?.Dispose();
+
+        foreach (var track in _overlayTracks)
+        {
+            track.Dispose();
+        }
+
+        _overlayTracks.Clear();
+    }
+
+    private sealed class OverlayTrackState : IDisposable
+    {
+        public OverlayTrackState(int trackIndex)
+        {
+            TrackIndex = trackIndex;
+        }
+
+        public int TrackIndex { get; }
+
+        public ClipPipeline? Current { get; set; }
+
+        public ClipPipeline? Next { get; set; }
+
+        public Texture? Live { get; private set; }
+
+        public Texture? Still { get; set; }
+
+        public bool LiveValid { get; set; }
+
+        public Guid StillToken { get; set; }
+
+        public double Aspect { get; set; } = 16.0 / 9.0;
+
+        public OverlayTransform Transform { get; set; } = OverlayTransform.Default;
+
+        public Texture? Texture => LiveValid ? Live : Still;
+
+        public Texture EnsureTexture(int width, int height)
+        {
+            if (Live is { } existing && existing.Size.X == (uint)width && existing.Size.Y == (uint)height)
+            {
+                return existing;
+            }
+
+            Live?.Dispose();
+            LiveValid = false;
+            Live = new Texture(new Vector2u((uint)width, (uint)height)) { Smooth = true };
+            return Live;
+        }
+
+        public void ClearFrames()
+        {
+            LiveValid = false;
+            Still?.Dispose();
+            Still = null;
+        }
+
+        public void DisposePipelines()
+        {
+            Current?.Dispose();
+            Current = null;
+            Next?.Dispose();
+            Next = null;
+        }
+
+        public void Dispose()
+        {
+            DisposePipelines();
+            Live?.Dispose();
+            Live = null;
+            Still?.Dispose();
+            Still = null;
+        }
     }
 }

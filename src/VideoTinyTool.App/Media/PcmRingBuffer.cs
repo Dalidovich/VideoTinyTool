@@ -1,6 +1,6 @@
 namespace VideoTinyTool.Media;
 
-public sealed class PcmRingBuffer
+public sealed class PcmRingBuffer : IPcmSource
 {
     private readonly byte[] _buffer;
     private readonly object _gate = new();
