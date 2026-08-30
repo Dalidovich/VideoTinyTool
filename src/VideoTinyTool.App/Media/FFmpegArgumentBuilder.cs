@@ -29,6 +29,11 @@ public readonly record struct OverlayItem(
 
 public static class FFmpegArgumentBuilder
 {
+    private const string SpeedVideoLabel = "[vspeed]";
+    private const string SpeedAudioLabel = "[aspeed]";
+    private const double MaxTempoStep = 2.0;
+    private const double SpeedTolerance = 0.0005;
+
     public static IReadOnlyList<ExportItem> BuildItems(Timeline timeline, IReadOnlyDictionary<Guid, MediaSource> sources)
     {
         var items = new List<ExportItem>(timeline.Clips.Count);
@@ -110,8 +115,8 @@ public static class FFmpegArgumentBuilder
         }
 
         args.Append(" -filter_complex ").Append(Quote(BuildFilterGraph(items, overlays, export)));
-        args.Append(" -map ").Append(Quote(VideoLabel(overlays)));
-        args.Append(" -map ").Append(Quote(AudioLabel(overlays)));
+        args.Append(" -map ").Append(Quote(VideoLabel(overlays, export)));
+        args.Append(" -map ").Append(Quote(AudioLabel(overlays, export)));
         args.Append(" -c:v ").Append(export.VideoCodec);
         args.Append(" -crf ").Append(export.Crf.ToString(CultureInfo.InvariantCulture));
         args.Append(" -preset ").Append(export.Preset);
@@ -187,9 +192,13 @@ public static class FFmpegArgumentBuilder
         graph.Append("concat=n=").Append(items.Count.ToString(CultureInfo.InvariantCulture)).Append(":v=1:a=1[v][a]");
 
         AppendOverlays(graph, items, overlays, export);
+        AppendSpeed(graph, overlays, export);
 
         return graph.ToString();
     }
+
+    public static TimeSpan OutputDuration(TimeSpan timelineDuration, ExportSettings export) =>
+        timelineDuration / ExportSettings.ClampSpeed(export.Speed);
 
     private static void AppendOverlays(
         StringBuilder graph,
@@ -266,12 +275,48 @@ public static class FFmpegArgumentBuilder
         graph.Append(":normalize=0:dropout_transition=0[amixed]");
     }
 
-    private static string VideoLabel(IReadOnlyList<OverlayItem> overlays) =>
+    private static void AppendSpeed(StringBuilder graph, IReadOnlyList<OverlayItem> overlays, ExportSettings export)
+    {
+        var speed = ExportSettings.ClampSpeed(export.Speed);
+        if (!ChangesSpeed(speed))
+        {
+            return;
+        }
+
+        graph.Append(';').Append(ComposedVideoLabel(overlays));
+        graph.Append("setpts=PTS/").Append(Number(speed));
+        graph.Append(",fps=").Append(export.FrameRate.ToString(CultureInfo.InvariantCulture));
+        graph.Append(SpeedVideoLabel);
+
+        graph.Append(';').Append(ComposedAudioLabel(overlays));
+        graph.Append(Tempo(speed));
+        graph.Append(SpeedAudioLabel);
+    }
+
+    private static string Tempo(double speed) =>
+        speed <= MaxTempoStep
+            ? "atempo=" + Number(speed)
+            : "atempo=" + Number(MaxTempoStep) + ",atempo=" + Number(speed / MaxTempoStep);
+
+    private static bool ChangesSpeed(double speed) =>
+        Math.Abs(speed - ExportSettings.NormalSpeed) > SpeedTolerance;
+
+    private static string VideoLabel(IReadOnlyList<OverlayItem> overlays, ExportSettings export) =>
+        ChangesSpeed(ExportSettings.ClampSpeed(export.Speed))
+            ? SpeedVideoLabel
+            : ComposedVideoLabel(overlays);
+
+    private static string AudioLabel(IReadOnlyList<OverlayItem> overlays, ExportSettings export) =>
+        ChangesSpeed(ExportSettings.ClampSpeed(export.Speed))
+            ? SpeedAudioLabel
+            : ComposedAudioLabel(overlays);
+
+    private static string ComposedVideoLabel(IReadOnlyList<OverlayItem> overlays) =>
         overlays.Count == 0
             ? "[v]"
             : "[acc" + (overlays.Count - 1).ToString(CultureInfo.InvariantCulture) + "]";
 
-    private static string AudioLabel(IReadOnlyList<OverlayItem> overlays)
+    private static string ComposedAudioLabel(IReadOnlyList<OverlayItem> overlays)
     {
         foreach (var overlay in overlays)
         {
@@ -303,7 +348,7 @@ public static class FFmpegArgumentBuilder
         ((long)Math.Round(value.TotalMilliseconds, MidpointRounding.AwayFromZero))
             .ToString(CultureInfo.InvariantCulture);
 
-    private static string Number(float value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+    private static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
 
     public static string Seconds(TimeSpan value) =>
         value.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture);

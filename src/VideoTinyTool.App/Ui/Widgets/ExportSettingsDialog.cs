@@ -27,6 +27,8 @@ public sealed class ExportSettingsDialog : ModalDialog
         "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"
     ];
 
+    private static readonly double[] Speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+
     private static readonly int[] Qualities = [16, 18, 20, 23, 26, 30];
     private static readonly int[] FrameRates = [24, 25, 30, 50, 60];
     private static readonly int[] AudioBitrates = [96, 128, 160, 192, 256, 320];
@@ -82,6 +84,12 @@ public sealed class ExportSettingsDialog : ModalDialog
                 I18n.ExportSetup.FrameRateHint,
                 new OptionPicker(Options(FrameRates, export.FrameRate), Number(export.FrameRate)),
                 (settings, value) => settings.FrameRate = Number(value)),
+
+            new Row(
+                I18n.ExportSetup.Speed,
+                I18n.ExportSetup.SpeedHint,
+                new OptionPicker(Options(Speeds, export.Speed), Number(export.Speed)),
+                (settings, value) => settings.Speed = Fraction(value)),
 
             new Row(
                 I18n.ExportSetup.AudioCodec,
@@ -255,6 +263,9 @@ public sealed class ExportSettingsDialog : ModalDialog
     private static IReadOnlyList<string> Options(IReadOnlyList<int> known, int current) =>
         known.Append(current).Distinct().Order().Select(Number).ToArray();
 
+    private static IReadOnlyList<string> Options(IReadOnlyList<double> known, double current) =>
+        known.Append(ExportSettings.ClampSpeed(current)).Distinct().Order().Select(Number).ToArray();
+
     private static IReadOnlyList<string> ResolutionOptions(int width, int height) =>
         Options(
             Resolutions.Select(size => Resolution(size.Width, size.Height)).ToArray(),
@@ -265,7 +276,12 @@ public sealed class ExportSettingsDialog : ModalDialog
 
     private static string Number(int value) => value.ToString(CultureInfo.InvariantCulture);
 
+    private static string Number(double value) =>
+        ExportSettings.ClampSpeed(value).ToString("0.###", CultureInfo.InvariantCulture);
+
     private static int Number(string value) => int.Parse(value, CultureInfo.InvariantCulture);
+
+    private static double Fraction(string value) => double.Parse(value, CultureInfo.InvariantCulture);
 
     private sealed class Row
     {

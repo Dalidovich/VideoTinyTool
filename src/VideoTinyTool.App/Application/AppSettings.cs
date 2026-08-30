@@ -18,6 +18,10 @@ public sealed class UiSettings
 
 public sealed class ExportSettings
 {
+    public const double MinSpeed = 0.5;
+    public const double MaxSpeed = 3.0;
+    public const double NormalSpeed = 1.0;
+
     public string Container { get; set; } = "mp4";
     public string VideoCodec { get; set; } = "libx264";
     public int Crf { get; set; } = 20;
@@ -25,8 +29,12 @@ public sealed class ExportSettings
     public int Width { get; set; } = 1920;
     public int Height { get; set; } = 1080;
     public int FrameRate { get; set; } = 30;
+    public double Speed { get; set; } = NormalSpeed;
     public string AudioCodec { get; set; } = "aac";
     public int AudioBitrateKbps { get; set; } = 192;
+
+    public static double ClampSpeed(double value) =>
+        double.IsFinite(value) && value > 0 ? Math.Clamp(value, MinSpeed, MaxSpeed) : NormalSpeed;
 }
 
 public sealed class PreviewSettings
@@ -61,6 +69,7 @@ public sealed class AppSettings
         Export.Width = EvenClamp(Export.Width, 1920, 16, 7680);
         Export.Height = EvenClamp(Export.Height, 1080, 16, 4320);
         Export.FrameRate = Math.Clamp(Export.FrameRate <= 0 ? 30 : Export.FrameRate, 1, 240);
+        Export.Speed = ExportSettings.ClampSpeed(Export.Speed);
         Export.AudioBitrateKbps = Math.Clamp(Export.AudioBitrateKbps <= 0 ? 192 : Export.AudioBitrateKbps, 32, 512);
 
         Preview.Width = EvenClamp(Preview.Width, 960, 160, 3840);

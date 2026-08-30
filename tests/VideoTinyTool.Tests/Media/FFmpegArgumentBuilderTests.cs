@@ -7,7 +7,7 @@ namespace VideoTinyTool.Tests.Media;
 
 public class FFmpegArgumentBuilderTests
 {
-    private static ExportSettings Settings() => new()
+    private static ExportSettings Settings(double speed = ExportSettings.NormalSpeed) => new()
     {
         Container = "mp4",
         VideoCodec = "libx264",
@@ -16,6 +16,7 @@ public class FFmpegArgumentBuilderTests
         Width = 1920,
         Height = 1080,
         FrameRate = 30,
+        Speed = speed,
         AudioCodec = "aac",
         AudioBitrateKbps = 192
     };
@@ -371,6 +372,94 @@ public class FFmpegArgumentBuilderTests
         {
             CultureInfo.CurrentCulture = previous;
         }
+    }
+
+    [Fact]
+    public void NormalSpeed_LeavesTheGraphAndTheMapsUntouched()
+    {
+        var items = new[] { Item(@"C:\media\a.mp4", 0, 4) };
+
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(items, [], Settings());
+        var args = FFmpegArgumentBuilder.Build(items, Settings(), @"C:\out\r.mp4");
+
+        Assert.DoesNotContain("setpts=PTS/", graph);
+        Assert.DoesNotContain("atempo", graph);
+        Assert.Contains("-map \"[v]\" -map \"[a]\"", args);
+    }
+
+    [Fact]
+    public void FasterSpeed_RetimesTheConcatenatedVideoAndAudio()
+    {
+        var items = new[] { Item(@"C:\media\a.mp4", 0, 4) };
+
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(items, [], Settings(1.5));
+        var args = FFmpegArgumentBuilder.Build(items, Settings(1.5), @"C:\out\r.mp4");
+
+        Assert.EndsWith(
+            "concat=n=1:v=1:a=1[v][a];[v]setpts=PTS/1.5,fps=30[vspeed];[a]atempo=1.5[aspeed]",
+            graph);
+        Assert.Contains("-map \"[vspeed]\" -map \"[aspeed]\"", args);
+    }
+
+    [Fact]
+    public void SlowerSpeed_StretchesThePictureAndTheSound()
+    {
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph([Item(@"C:\media\a.mp4", 0, 4)], [], Settings(0.5));
+
+        Assert.EndsWith("[v]setpts=PTS/0.5,fps=30[vspeed];[a]atempo=0.5[aspeed]", graph);
+    }
+
+    [Fact]
+    public void SpeedAboveTwo_ChainsTwoTempoStages()
+    {
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph([Item(@"C:\media\a.mp4", 0, 4)], [], Settings(3));
+
+        Assert.EndsWith("[v]setpts=PTS/3,fps=30[vspeed];[a]atempo=2,atempo=1.5[aspeed]", graph);
+    }
+
+    [Fact]
+    public void Speed_RetimesTheCompositeAfterOverlaysAndMixing()
+    {
+        var items = new[] { Item(@"C:\media\a.mp4", 0, 10) };
+        var overlays = new[] { Overlay(@"C:\media\pip.mp4", 0, 3, 1, OverlayTransform.Default, hasAudio: true) };
+
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(items, overlays, Settings(2));
+        var args = FFmpegArgumentBuilder.Build(items, overlays, Settings(2), @"C:\out\r.mp4");
+
+        Assert.EndsWith("[acc0]setpts=PTS/2,fps=30[vspeed];[amixed]atempo=2[aspeed]", graph);
+        Assert.Contains("-map \"[vspeed]\" -map \"[aspeed]\"", args);
+    }
+
+    [Fact]
+    public void SpeedNumbers_UseInvariantFormattingUnderACommaDecimalCulture()
+    {
+        var previous = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("ru-RU");
+
+        try
+        {
+            var graph = FFmpegArgumentBuilder.BuildFilterGraph([Item(@"C:\media\a.mp4", 0, 10)], [], Settings(2.5));
+
+            Assert.Contains("setpts=PTS/2.5", graph);
+            Assert.Contains("atempo=2,atempo=1.25", graph);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
+    }
+
+    [Theory]
+    [InlineData(1.0, 60)]
+    [InlineData(2.0, 30)]
+    [InlineData(0.5, 120)]
+    [InlineData(0, 60)]
+    [InlineData(9, 20)]
+    public void OutputDuration_ScalesTheTimelineByTheClampedSpeed(double speed, double expected)
+    {
+        var duration = FFmpegArgumentBuilder.OutputDuration(TimeSpan.FromSeconds(60), Settings(speed));
+
+        Assert.Equal(TimeSpan.FromSeconds(expected), duration);
     }
 
     [Fact]

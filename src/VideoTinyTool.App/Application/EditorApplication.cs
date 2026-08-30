@@ -716,7 +716,12 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         _progressDialog.AddButton(I18n.Dialogs.Cancel, ButtonStyle.Normal, () => _export.Cancel());
         ShowDialog(_progressDialog);
 
-        _export.Start(items, overlays, _settings.Export, path, _timeline.TotalDuration);
+        _export.Start(
+            items,
+            overlays,
+            _settings.Export,
+            path,
+            FFmpegArgumentBuilder.OutputDuration(_timeline.TotalDuration, _settings.Export));
     }
 
     public void SplitAtPlayhead()

@@ -95,6 +95,8 @@
     "resolutionHint": "Frame size of the result. Every clip is scaled to fit it, the aspect ratio is kept and the remaining space is filled with black bars.",
     "frameRate": "Frame rate",
     "frameRateHint": "Frames per second in the result. All clips are converted to this rate; a rate above the source one adds no smoothness, it only enlarges the file.",
+    "speed": "Speed, ×",
+    "speedHint": "Playback speed of the result. 1 keeps the original pace, values above it shorten the video, values below it stretch it. The sound follows the picture and keeps its pitch.",
     "audioCodec": "Audio codec",
     "audioCodecHint": "Encoder for the sound track. aac is the standard companion of mp4 and plays everywhere, libmp3lame is the classic mp3, ac3 is used by DVD and broadcast.",
     "audioBitrate": "Audio bitrate, kbps",

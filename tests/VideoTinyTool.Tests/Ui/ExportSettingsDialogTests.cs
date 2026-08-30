@@ -17,6 +17,7 @@ public class ExportSettingsDialogTests
             Width = 1440,
             Height = 1080,
             FrameRate = 48,
+            Speed = 1.3,
             AudioCodec = "ac3",
             AudioBitrateKbps = 224
         };
@@ -31,6 +32,7 @@ public class ExportSettingsDialogTests
         Assert.Equal(1440, target.Width);
         Assert.Equal(1080, target.Height);
         Assert.Equal(48, target.FrameRate);
+        Assert.Equal(1.3, target.Speed);
         Assert.Equal("ac3", target.AudioCodec);
         Assert.Equal(224, target.AudioBitrateKbps);
     }

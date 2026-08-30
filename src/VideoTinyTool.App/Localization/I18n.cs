@@ -141,6 +141,9 @@ public static class I18n
         public static string FrameRate => _catalog.Text("exportSetup.frameRate");
         public static string FrameRateHint => _catalog.Text("exportSetup.frameRateHint");
 
+        public static string Speed => _catalog.Text("exportSetup.speed");
+        public static string SpeedHint => _catalog.Text("exportSetup.speedHint");
+
         public static string AudioCodec => _catalog.Text("exportSetup.audioCodec");
         public static string AudioCodecHint => _catalog.Text("exportSetup.audioCodecHint");
 

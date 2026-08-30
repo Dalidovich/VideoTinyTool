@@ -105,6 +105,7 @@ dotnet publish src/VideoTinyTool.App/VideoTinyTool.App.csproj -c Release -o publ
     "width": 1920,
     "height": 1080,
     "frameRate": 30,
+    "speed": 1,
     "audioCodec": "aac",
     "audioBitrateKbps": 192
   },
