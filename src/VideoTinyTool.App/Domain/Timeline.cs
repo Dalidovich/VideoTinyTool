@@ -2,9 +2,21 @@ namespace VideoTinyTool.Domain;
 
 public sealed class Timeline
 {
-    private readonly List<Clip> _clips = new();
+    public const int MaxTracks = 4;
 
-    public IReadOnlyList<Clip> Clips => _clips;
+    private readonly List<Track> _tracks = new();
+
+    public Timeline()
+    {
+        var baseTrack = new Track { Owner = this };
+        _tracks.Add(baseTrack);
+    }
+
+    public IReadOnlyList<Track> Tracks => _tracks;
+
+    public Track BaseTrack => _tracks[0];
+
+    public IReadOnlyList<Clip> Clips => BaseTrack.Clips;
 
     public event Action? Changed;
 
@@ -13,39 +25,122 @@ public sealed class Timeline
         get
         {
             var total = TimeSpan.Zero;
-            foreach (var clip in _clips)
+            foreach (var track in _tracks)
             {
-                total += clip.LeadingGap + clip.Duration;
+                var end = track.Duration;
+                if (end > total)
+                {
+                    total = end;
+                }
             }
 
             return total;
         }
     }
 
-    public void Insert(int index, Clip clip)
+    public IReadOnlyList<Clip> ClipsOf(int trackIndex) => _tracks[trackIndex].Clips;
+
+    public Track? TrackOf(Clip clip)
     {
-        _clips.Insert(Math.Clamp(index, 0, _clips.Count), clip);
+        foreach (var track in _tracks)
+        {
+            if (track.Contains(clip))
+            {
+                return track;
+            }
+        }
+
+        return null;
+    }
+
+    public int TrackIndexOf(Clip clip)
+    {
+        for (var i = 0; i < _tracks.Count; i++)
+        {
+            if (_tracks[i].Contains(clip))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    public int IndexOfTrack(Track track)
+    {
+        for (var i = 0; i < _tracks.Count; i++)
+        {
+            if (ReferenceEquals(_tracks[i], track))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    public Track? AddTrack()
+    {
+        var track = new Track();
+        return InsertTrack(_tracks.Count, track) ? track : null;
+    }
+
+    public bool InsertTrack(int index, Track track)
+    {
+        if (_tracks.Count >= MaxTracks || index <= 0 || index > _tracks.Count)
+        {
+            return false;
+        }
+
+        track.Owner = this;
+        _tracks.Insert(index, track);
+        Changed?.Invoke();
+        return true;
+    }
+
+    public bool RemoveTrackAt(int index)
+    {
+        if (index <= 0 || index >= _tracks.Count)
+        {
+            return false;
+        }
+
+        _tracks[index].Owner = null;
+        _tracks.RemoveAt(index);
+        Changed?.Invoke();
+        return true;
+    }
+
+    public void Insert(int index, Clip clip) => Insert(0, index, clip);
+
+    public void Insert(int trackIndex, int index, Clip clip)
+    {
+        _tracks[trackIndex].Insert(index, clip);
         Changed?.Invoke();
     }
 
-    public void Add(Clip clip) => Insert(_clips.Count, clip);
+    public void Add(Clip clip) => Insert(0, BaseTrack.Clips.Count, clip);
 
-    public void RemoveAt(int index)
+    public void Add(int trackIndex, Clip clip) => Insert(trackIndex, _tracks[trackIndex].Clips.Count, clip);
+
+    public void RemoveAt(int index) => RemoveAt(0, index);
+
+    public void RemoveAt(int trackIndex, int index)
     {
-        _clips.RemoveAt(index);
+        _tracks[trackIndex].RemoveAt(index);
         Changed?.Invoke();
     }
 
-    public void Move(int fromIndex, int toIndex)
+    public void Move(int fromIndex, int toIndex) => Move(0, fromIndex, toIndex);
+
+    public void Move(int trackIndex, int fromIndex, int toIndex)
     {
         if (fromIndex == toIndex)
         {
             return;
         }
 
-        var clip = _clips[fromIndex];
-        _clips.RemoveAt(fromIndex);
-        _clips.Insert(Math.Clamp(toIndex, 0, _clips.Count), clip);
+        _tracks[trackIndex].Move(fromIndex, toIndex);
         Changed?.Invoke();
     }
 
@@ -62,13 +157,22 @@ public sealed class Timeline
         Changed?.Invoke();
     }
 
-    public int IndexOf(Clip clip) => _clips.IndexOf(clip);
+    public void SetOverlay(Clip clip, OverlayTransform transform)
+    {
+        clip.Overlay = transform.Clamped();
+        Changed?.Invoke();
+    }
+
+    public int IndexOf(Clip clip) => BaseTrack.IndexOf(clip);
+
+    public int IndexOf(int trackIndex, Clip clip) => _tracks[trackIndex].IndexOf(clip);
 
     public Clip? FindById(Guid id)
     {
-        foreach (var clip in _clips)
+        foreach (var track in _tracks)
         {
-            if (clip.Id == id)
+            var clip = track.FindById(id);
+            if (clip is not null)
             {
                 return clip;
             }
@@ -77,86 +181,19 @@ public sealed class Timeline
         return null;
     }
 
-    public TimeSpan StartOf(Clip clip)
-    {
-        var start = TimeSpan.Zero;
-        foreach (var current in _clips)
-        {
-            start += current.LeadingGap;
-            if (ReferenceEquals(current, clip))
-            {
-                return start;
-            }
+    public TimeSpan StartOf(Clip clip) => (TrackOf(clip) ?? BaseTrack).StartOf(clip);
 
-            start += current.Duration;
-        }
+    public TimeSpan StartOf(int index) => BaseTrack.StartOf(index);
 
-        return TimeSpan.Zero;
-    }
+    public TimeSpan StartOf(int trackIndex, int index) => _tracks[trackIndex].StartOf(index);
 
-    public TimeSpan StartOf(int index)
-    {
-        var start = TimeSpan.Zero;
-        for (var i = 0; i < _clips.Count; i++)
-        {
-            start += _clips[i].LeadingGap;
-            if (i == index)
-            {
-                return start;
-            }
+    public TimeSpan NextClipStart(TimeSpan global) => BaseTrack.NextClipStart(global);
 
-            start += _clips[i].Duration;
-        }
+    public TimeSpan NextClipStart(int trackIndex, TimeSpan global) => _tracks[trackIndex].NextClipStart(global);
 
-        return start;
-    }
+    public TimelineLocation? Resolve(TimeSpan global) => BaseTrack.Resolve(global, 0);
 
-    public TimeSpan NextClipStart(TimeSpan global)
-    {
-        var start = TimeSpan.Zero;
-        foreach (var clip in _clips)
-        {
-            start += clip.LeadingGap;
-            if (start >= global)
-            {
-                return start;
-            }
-
-            start += clip.Duration;
-        }
-
-        return start;
-    }
-
-    public TimelineLocation? Resolve(TimeSpan global)
-    {
-        if (global < TimeSpan.Zero)
-        {
-            return null;
-        }
-
-        var start = TimeSpan.Zero;
-        for (var i = 0; i < _clips.Count; i++)
-        {
-            var clip = _clips[i];
-            start += clip.LeadingGap;
-
-            if (global < start)
-            {
-                return null;
-            }
-
-            var end = start + clip.Duration;
-            if (global < end)
-            {
-                return new TimelineLocation(clip, i, clip.In + (global - start));
-            }
-
-            start = end;
-        }
-
-        return null;
-    }
+    public TimelineLocation? Resolve(int trackIndex, TimeSpan global) => _tracks[trackIndex].Resolve(global, trackIndex);
 
     public void RaiseChanged() => Changed?.Invoke();
 }

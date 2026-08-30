@@ -22,8 +22,9 @@ public sealed class Clip
     public TimeSpan In { get; internal set; }
     public TimeSpan Out { get; internal set; }
     public TimeSpan LeadingGap { get; internal set; }
+    public OverlayTransform Overlay { get; internal set; } = OverlayTransform.Default;
 
     public TimeSpan Duration => Out - In;
 
-    public Clip WithBounds(TimeSpan @in, TimeSpan @out) => new(Id, SourceId, @in, @out) { LeadingGap = LeadingGap };
+    public Clip WithBounds(TimeSpan @in, TimeSpan @out) => new(Id, SourceId, @in, @out) { LeadingGap = LeadingGap, Overlay = Overlay };
 }

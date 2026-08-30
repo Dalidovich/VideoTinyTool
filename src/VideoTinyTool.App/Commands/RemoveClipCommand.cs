@@ -6,6 +6,7 @@ public sealed class RemoveClipCommand : IEditCommand
 {
     private readonly Clip _clip;
     private readonly bool _ripple;
+    private int _trackIndex;
     private int _index;
     private TimeSpan _gap;
 
@@ -13,6 +14,7 @@ public sealed class RemoveClipCommand : IEditCommand
     {
         _clip = clip;
         _ripple = ripple;
+        _trackIndex = -1;
         _index = -1;
     }
 
@@ -22,7 +24,8 @@ public sealed class RemoveClipCommand : IEditCommand
 
     public void Execute(Timeline timeline)
     {
-        _index = timeline.IndexOf(_clip);
+        _trackIndex = timeline.TrackIndexOf(_clip);
+        _index = _trackIndex < 0 ? -1 : timeline.IndexOf(_trackIndex, _clip);
         if (_index < 0)
         {
             return;
@@ -30,13 +33,14 @@ public sealed class RemoveClipCommand : IEditCommand
 
         _gap = _clip.LeadingGap;
 
-        if (_index + 1 < timeline.Clips.Count)
+        var clips = timeline.ClipsOf(_trackIndex);
+        if (_index + 1 < clips.Count)
         {
-            var follower = timeline.Clips[_index + 1];
+            var follower = clips[_index + 1];
             timeline.SetLeadingGap(follower, follower.LeadingGap + Displaced());
         }
 
-        timeline.RemoveAt(_index);
+        timeline.RemoveAt(_trackIndex, _index);
     }
 
     public void Undo(Timeline timeline)
@@ -46,14 +50,15 @@ public sealed class RemoveClipCommand : IEditCommand
             return;
         }
 
-        if (_index < timeline.Clips.Count)
+        var clips = timeline.ClipsOf(_trackIndex);
+        if (_index < clips.Count)
         {
-            var follower = timeline.Clips[_index];
+            var follower = clips[_index];
             timeline.SetLeadingGap(follower, follower.LeadingGap - Displaced());
         }
 
         timeline.SetLeadingGap(_clip, _gap);
-        timeline.Insert(_index, _clip);
+        timeline.Insert(_trackIndex, _index, _clip);
     }
 
     private TimeSpan Displaced() => _ripple ? _gap : _gap + _clip.Duration;

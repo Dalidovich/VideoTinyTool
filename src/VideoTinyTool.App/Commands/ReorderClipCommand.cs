@@ -7,6 +7,7 @@ public sealed class ReorderClipCommand : IEditCommand
     private readonly Clip _clip;
     private readonly int _fromIndex;
     private readonly int _toIndex;
+    private int _trackIndex = -1;
 
     public ReorderClipCommand(Clip clip, int fromIndex, int toIndex)
     {
@@ -19,7 +20,24 @@ public sealed class ReorderClipCommand : IEditCommand
 
     public Clip Clip => _clip;
 
-    public void Execute(Timeline timeline) => timeline.Move(_fromIndex, _toIndex);
+    public void Execute(Timeline timeline)
+    {
+        _trackIndex = timeline.TrackIndexOf(_clip);
+        if (_trackIndex < 0)
+        {
+            return;
+        }
 
-    public void Undo(Timeline timeline) => timeline.Move(_toIndex, _fromIndex);
+        timeline.Move(_trackIndex, _fromIndex, _toIndex);
+    }
+
+    public void Undo(Timeline timeline)
+    {
+        if (_trackIndex < 0)
+        {
+            return;
+        }
+
+        timeline.Move(_trackIndex, _toIndex, _fromIndex);
+    }
 }

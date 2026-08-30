@@ -7,6 +7,7 @@ public sealed class SplitClipCommand : IEditCommand
     private readonly Clip _original;
     private readonly Clip _left;
     private readonly Clip _right;
+    private int _trackIndex;
     private int _index;
 
     public SplitClipCommand(Clip original, TimeSpan sourceSplitPoint)
@@ -14,6 +15,7 @@ public sealed class SplitClipCommand : IEditCommand
         _original = original;
         _left = Clip.Create(original.SourceId, original.In, sourceSplitPoint);
         _right = Clip.Create(original.SourceId, sourceSplitPoint, original.Out);
+        _trackIndex = -1;
         _index = -1;
     }
 
@@ -25,33 +27,41 @@ public sealed class SplitClipCommand : IEditCommand
 
     public void Execute(Timeline timeline)
     {
-        _index = timeline.IndexOf(_original);
+        _trackIndex = timeline.TrackIndexOf(_original);
+        _index = _trackIndex < 0 ? -1 : timeline.IndexOf(_trackIndex, _original);
         if (_index < 0)
         {
             return;
         }
 
+        timeline.SetOverlay(_left, _original.Overlay);
+        timeline.SetOverlay(_right, _original.Overlay);
         timeline.SetLeadingGap(_left, _original.LeadingGap);
-        timeline.RemoveAt(_index);
-        timeline.Insert(_index, _right);
-        timeline.Insert(_index, _left);
+        timeline.RemoveAt(_trackIndex, _index);
+        timeline.Insert(_trackIndex, _index, _right);
+        timeline.Insert(_trackIndex, _index, _left);
     }
 
     public void Undo(Timeline timeline)
     {
-        var leftIndex = timeline.IndexOf(_left);
+        if (_trackIndex < 0)
+        {
+            return;
+        }
+
+        var leftIndex = timeline.IndexOf(_trackIndex, _left);
         if (leftIndex < 0)
         {
             return;
         }
 
-        timeline.RemoveAt(leftIndex);
-        var rightIndex = timeline.IndexOf(_right);
+        timeline.RemoveAt(_trackIndex, leftIndex);
+        var rightIndex = timeline.IndexOf(_trackIndex, _right);
         if (rightIndex >= 0)
         {
-            timeline.RemoveAt(rightIndex);
+            timeline.RemoveAt(_trackIndex, rightIndex);
         }
 
-        timeline.Insert(leftIndex, _original);
+        timeline.Insert(_trackIndex, leftIndex, _original);
     }
 }

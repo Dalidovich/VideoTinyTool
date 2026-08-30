@@ -8,7 +8,7 @@ public sealed class RemoveSourceCommand : IEditCommand
     private readonly int _sourceIndex;
     private readonly Action<MediaSource> _detach;
     private readonly Action<int, MediaSource> _restore;
-    private readonly List<(int Index, Clip Clip, TimeSpan Gap)> _removed = new();
+    private readonly List<(int TrackIndex, int Index, Clip Clip, TimeSpan Gap)> _removed = new();
 
     public RemoveSourceCommand(
         MediaSource source,
@@ -30,23 +30,27 @@ public sealed class RemoveSourceCommand : IEditCommand
     {
         _removed.Clear();
 
-        for (var index = timeline.Clips.Count - 1; index >= 0; index--)
+        for (var trackIndex = 0; trackIndex < timeline.Tracks.Count; trackIndex++)
         {
-            var clip = timeline.Clips[index];
-            if (clip.SourceId != _source.Id)
+            var clips = timeline.ClipsOf(trackIndex);
+            for (var index = clips.Count - 1; index >= 0; index--)
             {
-                continue;
+                var clip = clips[index];
+                if (clip.SourceId != _source.Id)
+                {
+                    continue;
+                }
+
+                _removed.Add((trackIndex, index, clip, clip.LeadingGap));
+
+                if (index + 1 < clips.Count)
+                {
+                    var follower = clips[index + 1];
+                    timeline.SetLeadingGap(follower, follower.LeadingGap + clip.LeadingGap + clip.Duration);
+                }
+
+                timeline.RemoveAt(trackIndex, index);
             }
-
-            _removed.Add((index, clip, clip.LeadingGap));
-
-            if (index + 1 < timeline.Clips.Count)
-            {
-                var follower = timeline.Clips[index + 1];
-                timeline.SetLeadingGap(follower, follower.LeadingGap + clip.LeadingGap + clip.Duration);
-            }
-
-            timeline.RemoveAt(index);
         }
 
         _detach(_source);
@@ -58,16 +62,17 @@ public sealed class RemoveSourceCommand : IEditCommand
 
         for (var i = _removed.Count - 1; i >= 0; i--)
         {
-            var (index, clip, gap) = _removed[i];
+            var (trackIndex, index, clip, gap) = _removed[i];
+            var clips = timeline.ClipsOf(trackIndex);
 
-            if (index < timeline.Clips.Count)
+            if (index < clips.Count)
             {
-                var follower = timeline.Clips[index];
+                var follower = clips[index];
                 timeline.SetLeadingGap(follower, follower.LeadingGap - gap - clip.Duration);
             }
 
             timeline.SetLeadingGap(clip, gap);
-            timeline.Insert(index, clip);
+            timeline.Insert(trackIndex, index, clip);
         }
     }
 }
