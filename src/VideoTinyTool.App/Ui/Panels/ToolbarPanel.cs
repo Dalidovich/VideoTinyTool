@@ -15,6 +15,7 @@ public sealed class ToolbarPanel : PanelBase
     private readonly Button _undo = new(I18n.Toolbar.Undo, ButtonStyle.Ghost);
     private readonly Button _redo = new(I18n.Toolbar.Redo, ButtonStyle.Ghost);
     private readonly Button _export = new(I18n.Toolbar.Export, ButtonStyle.Accent);
+    private readonly Button _help = new(I18n.Toolbar.Help);
 
     private float _separatorX;
 
@@ -28,6 +29,7 @@ public sealed class ToolbarPanel : PanelBase
         _undo.Clicked += host.Undo;
         _redo.Clicked += host.Redo;
         _export.Clicked += host.ExportTimeline;
+        _help.Clicked += host.ShowShortcuts;
     }
 
     private IEnumerable<Button> Buttons
@@ -40,6 +42,7 @@ public sealed class ToolbarPanel : PanelBase
             yield return _undo;
             yield return _redo;
             yield return _export;
+            yield return _help;
         }
     }
 
@@ -72,6 +75,11 @@ public sealed class ToolbarPanel : PanelBase
         _export.Bounds = new FloatRect(
             new Vector2f(MathF.Round(Bounds.Left + Bounds.Width - 12f - exportWidth), MathF.Round(top)),
             new Vector2f(exportWidth, height));
+
+        var helpWidth = Math.Max(height, _help.PreferredWidth(renderer));
+        _help.Bounds = new FloatRect(
+            new Vector2f(MathF.Round(_export.Bounds.Left - 8f - helpWidth), MathF.Round(top)),
+            new Vector2f(helpWidth, height));
     }
 
     private void RefreshEnabled()
@@ -105,7 +113,7 @@ public sealed class ToolbarPanel : PanelBase
 
         renderer.DrawText(
             TimeFormat.Timecode(_host.Timeline.TotalDuration),
-            _export.Bounds.Left - 14f,
+            _help.Bounds.Left - 14f,
             Bounds.Top + 12f,
             Theme.FontSizeSmall,
             Theme.TextDim,

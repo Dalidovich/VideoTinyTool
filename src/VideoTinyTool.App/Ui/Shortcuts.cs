@@ -25,7 +25,8 @@ public enum EditorCommand
     Import,
     Export,
     ZoomIn,
-    ZoomOut
+    ZoomOut,
+    Help
 }
 
 public static class Shortcuts
@@ -73,6 +74,7 @@ public static class Shortcuts
             Keyboard.Key.Delete => EditorCommand.Delete,
             Keyboard.Key.Add or Keyboard.Key.Equal => EditorCommand.ZoomIn,
             Keyboard.Key.Subtract or Keyboard.Key.Hyphen => EditorCommand.ZoomOut,
+            Keyboard.Key.F1 => EditorCommand.Help,
             _ => EditorCommand.None
         };
     }

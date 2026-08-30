@@ -361,6 +361,10 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             case EditorCommand.ZoomOut:
                 _timelinePanel.ZoomBy(1f / 1.25f);
                 break;
+
+            case EditorCommand.Help:
+                ShowShortcuts();
+                break;
         }
     }
 
@@ -839,6 +843,8 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             _dialog = _dialogQueue.Dequeue();
         }
     }
+
+    public void ShowShortcuts() => ShowDialog(new HelpDialog());
 
     private void ShowMessage(string title, string message)
     {

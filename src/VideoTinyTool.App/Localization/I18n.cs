@@ -28,6 +28,42 @@ public static class I18n
         public static string Undo => _catalog.Text("toolbar.undo");
         public static string Redo => _catalog.Text("toolbar.redo");
         public static string Export => _catalog.Text("toolbar.export");
+        public static string Help => _catalog.Text("toolbar.help");
+    }
+
+    public static class Help
+    {
+        public static string Title => _catalog.Text("help.title");
+
+        public static string Playback => _catalog.Text("help.playback");
+        public static string Editing => _catalog.Text("help.editing");
+        public static string Files => _catalog.Text("help.files");
+        public static string View => _catalog.Text("help.view");
+        public static string Dialogs => _catalog.Text("help.dialogs");
+
+        public static string PlayPause => _catalog.Text("help.playPause");
+        public static string Shuttle => _catalog.Text("help.shuttle");
+        public static string StepFrame => _catalog.Text("help.stepFrame");
+        public static string StepSecond => _catalog.Text("help.stepSecond");
+        public static string JumpToEnds => _catalog.Text("help.jumpToEnds");
+
+        public static string Split => _catalog.Text("help.split");
+        public static string Trim => _catalog.Text("help.trim");
+        public static string Remove => _catalog.Text("help.remove");
+        public static string RippleDelete => _catalog.Text("help.rippleDelete");
+        public static string Undo => _catalog.Text("help.undo");
+        public static string Redo => _catalog.Text("help.redo");
+
+        public static string Import => _catalog.Text("help.import");
+        public static string Export => _catalog.Text("help.export");
+
+        public static string Zoom => _catalog.Text("help.zoom");
+        public static string ZoomAtCursor => _catalog.Text("help.zoomAtCursor");
+        public static string ScrollTimeline => _catalog.Text("help.scrollTimeline");
+        public static string ShowHelp => _catalog.Text("help.showHelp");
+
+        public static string Confirm => _catalog.Text("help.confirm");
+        public static string Dismiss => _catalog.Text("help.dismiss");
     }
 
     public static class Preview

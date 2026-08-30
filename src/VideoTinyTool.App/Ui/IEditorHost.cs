@@ -56,4 +56,6 @@ public interface IEditorHost
     void Undo();
 
     void Redo();
+
+    void ShowShortcuts();
 }

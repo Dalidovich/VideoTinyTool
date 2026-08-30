@@ -5,10 +5,11 @@ namespace VideoTinyTool.Ui.Widgets;
 
 public class ModalDialog
 {
-    private const float Width = 520f;
-    private const float HorizontalPadding = 22f;
+    private const float DefaultWidth = 520f;
     private const float VerticalPadding = 18f;
     private const float ButtonHeight = 26f;
+
+    protected const float HorizontalPadding = 22f;
 
     private readonly List<Button> _buttons = new();
 
@@ -41,9 +42,12 @@ public class ModalDialog
     public virtual float ContentHeight(Renderer renderer, float contentWidth) =>
         WrapLines(renderer, contentWidth).Count * 19f;
 
+    protected virtual float MeasureWidth(Renderer renderer) => DefaultWidth;
+
     public void Layout(Renderer renderer, uint windowWidth, uint windowHeight)
     {
-        var contentWidth = Width - (HorizontalPadding * 2);
+        var width = MeasureWidth(renderer);
+        var contentWidth = width - (HorizontalPadding * 2);
         var height = VerticalPadding
                      + 22f
                      + 10f
@@ -53,8 +57,8 @@ public class ModalDialog
                      + VerticalPadding;
 
         Bounds = new FloatRect(
-            new Vector2f(MathF.Round((windowWidth - Width) / 2f), MathF.Round((windowHeight - height) / 2f)),
-            new Vector2f(Width, height));
+            new Vector2f(MathF.Round((windowWidth - width) / 2f), MathF.Round((windowHeight - height) / 2f)),
+            new Vector2f(width, height));
 
         var x = Bounds.Left + Bounds.Width - HorizontalPadding;
         var y = Bounds.Top + Bounds.Height - VerticalPadding - ButtonHeight;
@@ -62,9 +66,9 @@ public class ModalDialog
         for (var i = _buttons.Count - 1; i >= 0; i--)
         {
             var button = _buttons[i];
-            var width = Math.Max(78f, button.PreferredWidth(renderer));
-            x -= width;
-            button.Bounds = new FloatRect(new Vector2f(x, y), new Vector2f(width, ButtonHeight));
+            var buttonWidth = Math.Max(78f, button.PreferredWidth(renderer));
+            x -= buttonWidth;
+            button.Bounds = new FloatRect(new Vector2f(x, y), new Vector2f(buttonWidth, ButtonHeight));
             x -= 8f;
         }
     }
