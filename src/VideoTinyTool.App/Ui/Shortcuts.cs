@@ -26,6 +26,8 @@ public enum EditorCommand
     Export,
     ZoomIn,
     ZoomOut,
+    AddTrack,
+    RemoveTrack,
     Help
 }
 
@@ -42,6 +44,7 @@ public static class Shortcuts
                 Keyboard.Key.K => EditorCommand.Split,
                 Keyboard.Key.O => EditorCommand.Import,
                 Keyboard.Key.M => EditorCommand.Export,
+                Keyboard.Key.T => key.Shift ? EditorCommand.RemoveTrack : EditorCommand.AddTrack,
                 _ => EditorCommand.None
             };
         }

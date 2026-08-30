@@ -61,6 +61,8 @@ public static class I18n
         public static string ZoomAtCursor => _catalog.Text("help.zoomAtCursor");
         public static string ScrollTimeline => _catalog.Text("help.scrollTimeline");
         public static string ShowHelp => _catalog.Text("help.showHelp");
+        public static string AddTrack => _catalog.Text("help.addTrack");
+        public static string RemoveTrack => _catalog.Text("help.removeTrack");
 
         public static string Confirm => _catalog.Text("help.confirm");
         public static string Dismiss => _catalog.Text("help.dismiss");
@@ -100,6 +102,10 @@ public static class I18n
         public static string OutPrefix => _catalog.Text("timeline.outPrefix");
         public static string NoTimecode => _catalog.Text("timeline.noTimecode");
         public static string Zoom => _catalog.Text("timeline.zoom");
+        public static string AddTrack => _catalog.Text("timeline.addTrack");
+        public static string RemoveTrack => _catalog.Text("timeline.removeTrack");
+
+        public static string TrackLabel(int number) => _catalog.Format("timeline.trackLabel", number);
 
         public static string ClipCount(int count) => _catalog.Plural("timeline.clipCount", count, count);
     }

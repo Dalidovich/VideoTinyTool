@@ -14,6 +14,8 @@ public sealed class TimelinePanel : PanelBase
     private const float MaxPixelsPerSecond = 4000f;
     private const float EdgeGrabWidth = 7f;
     private const float ClipPadding = 8f;
+    private const float TrackButtonSize = 15f;
+    private const float LaneWheelStep = 24f;
 
     private static readonly double[] TickSteps =
     [
@@ -29,15 +31,24 @@ public sealed class TimelinePanel : PanelBase
         MoveClip
     }
 
+    private readonly record struct ClipHit(Clip Clip, int TrackIndex, int Index, FloatRect Bounds);
+
     private readonly IEditorHost _host;
     private readonly Slider _zoom = new() { ShowKnob = true, TrackHeight = 3f };
+    private readonly Button _addTrack = new(I18n.Timeline.AddTrack);
+    private readonly List<Button> _removeTrack = new();
 
     private float _pixelsPerSecond = 40f;
     private double _scrollSeconds;
+    private float _laneScroll;
     private DragMode _drag = DragMode.None;
     private Clip? _dragClip;
     private TimeSpan _dragOriginalIn;
     private TimeSpan _dragOriginalOut;
+    private TimeSpan _dragGrabOffset;
+    private TimeSpan _dragStart;
+    private int _dragFromTrack = -1;
+    private int _dragToTrack = -1;
     private int _dragFromIndex = -1;
     private int _dragToIndex = -1;
     private bool _wasPlayingBeforeDrag;
@@ -47,7 +58,31 @@ public sealed class TimelinePanel : PanelBase
         _host = host;
         _zoom.Value = ZoomToValue(_pixelsPerSecond);
         _zoom.ValueChanged += value => SetZoom(ValueToZoom(value), LaneBounds.Left + (LaneBounds.Width / 2f));
+
+        _addTrack.Clicked += _host.AddTrack;
+
+        for (var track = 1; track < Domain.Timeline.MaxTracks; track++)
+        {
+            var index = track;
+            var button = new Button(I18n.Timeline.RemoveTrack, ButtonStyle.Ghost);
+            button.Clicked += () => _host.RemoveTrack(index);
+            _removeTrack.Add(button);
+        }
     }
+
+    private IEnumerable<Button> TrackButtons
+    {
+        get
+        {
+            yield return _addTrack;
+            foreach (var button in _removeTrack)
+            {
+                yield return button;
+            }
+        }
+    }
+
+    private int TrackCount => _host.Timeline.Tracks.Count;
 
     private FloatRect BodyArea => new(
         new Vector2f(Bounds.Left, Bounds.Top + Theme.PanelHeaderHeight),
@@ -61,9 +96,17 @@ public sealed class TimelinePanel : PanelBase
         new Vector2f(BodyArea.Left + Theme.TrackHeaderWidth, BodyArea.Top + Theme.RulerHeight),
         new Vector2f(BodyArea.Width - Theme.TrackHeaderWidth, BodyArea.Height - Theme.RulerHeight));
 
+    private FloatRect HeaderColumn => new(
+        new Vector2f(BodyArea.Left, LaneBounds.Top),
+        new Vector2f(Theme.TrackHeaderWidth, LaneBounds.Height));
+
     private FloatRect FooterBounds => new(
         new Vector2f(Bounds.Left, Bounds.Top + Bounds.Height - Theme.TimelineFooterHeight),
         new Vector2f(Bounds.Width, Theme.TimelineFooterHeight));
+
+    private float LaneHeight => LaneGeometry.LaneHeight(LaneBounds.Height, TrackCount);
+
+    private bool IsReorderDrag => _dragFromTrack == 0 && _dragToTrack == 0;
 
     private float TimeToX(TimeSpan time) =>
         LaneBounds.Left + (float)((time.TotalSeconds - _scrollSeconds) * _pixelsPerSecond);
@@ -71,12 +114,63 @@ public sealed class TimelinePanel : PanelBase
     private TimeSpan XToTime(float x) =>
         TimeSpan.FromSeconds(_scrollSeconds + ((x - LaneBounds.Left) / _pixelsPerSecond));
 
+    private FloatRect LaneRect(int trackIndex)
+    {
+        var lane = LaneBounds;
+        return new FloatRect(
+            new Vector2f(
+                lane.Left,
+                lane.Top + LaneGeometry.LaneOffset(lane.Height, TrackCount, trackIndex, _laneScroll)),
+            new Vector2f(lane.Width, LaneHeight));
+    }
+
+    private FloatRect HeaderCell(int trackIndex)
+    {
+        var row = LaneRect(trackIndex);
+        return new FloatRect(
+            new Vector2f(BodyArea.Left, row.Top),
+            new Vector2f(Theme.TrackHeaderWidth, row.Height));
+    }
+
+    private static float ClipInset(float laneHeight) => MathF.Min(ClipPadding, MathF.Round(laneHeight * 0.12f));
+
     public void Layout(Renderer renderer)
     {
         var footer = FooterBounds;
         _zoom.Bounds = new FloatRect(
             new Vector2f(footer.Left + footer.Width - Theme.Padding - 96f, footer.Top + ((footer.Height - 10f) / 2f)),
             new Vector2f(96f, 10f));
+
+        LayoutTrackButtons();
+    }
+
+    private void LayoutTrackButtons()
+    {
+        _laneScroll = LaneGeometry.ClampScroll(_laneScroll, LaneBounds.Height, TrackCount);
+
+        for (var track = 1; track < Domain.Timeline.MaxTracks; track++)
+        {
+            var button = _removeTrack[track - 1];
+            var cell = HeaderCell(track);
+
+            button.Bounds = track < TrackCount
+                ? Reachable(new FloatRect(
+                    new Vector2f(cell.Left + cell.Width - TrackButtonSize - 5f, cell.Top + 5f),
+                    new Vector2f(TrackButtonSize, TrackButtonSize)))
+                : default;
+        }
+
+        var baseCell = HeaderCell(0);
+        _addTrack.Enabled = TrackCount < Domain.Timeline.MaxTracks;
+        _addTrack.Bounds = Reachable(new FloatRect(
+            new Vector2f(baseCell.Left + 6f, baseCell.Top + baseCell.Height - TrackButtonSize - 6f),
+            new Vector2f(baseCell.Width - 12f, TrackButtonSize)));
+    }
+
+    private FloatRect Reachable(FloatRect bounds)
+    {
+        var lane = LaneBounds;
+        return bounds.Top >= lane.Top && bounds.Top + bounds.Height <= lane.Top + lane.Height ? bounds : default;
     }
 
     public override void Draw(Renderer renderer)
@@ -84,12 +178,13 @@ public sealed class TimelinePanel : PanelBase
         renderer.FillRect(Bounds, Theme.Panel);
         renderer.HorizontalLine(Bounds.Left, Bounds.Top, Bounds.Width, Theme.Line);
 
-        var clipCount = _host.Timeline.Clips.Count;
+        var clipCount = _host.Timeline.Tracks.Sum(track => track.Clips.Count);
         DrawHeader(renderer, I18n.Timeline.Title, I18n.Timeline.ClipCount(clipCount));
 
         ClampScroll();
         DrawRuler(renderer);
-        DrawLane(renderer);
+        DrawLanes(renderer);
+        DrawTrackHeaders(renderer);
         DrawPlayhead(renderer);
         DrawFooter(renderer);
     }
@@ -131,40 +226,82 @@ public sealed class TimelinePanel : PanelBase
         renderer.PopClip();
     }
 
-    private void DrawLane(Renderer renderer)
+    private void DrawLanes(Renderer renderer)
     {
         var lane = LaneBounds;
-
-        renderer.FillRect(
-            new FloatRect(new Vector2f(BodyArea.Left, lane.Top), new Vector2f(Theme.TrackHeaderWidth, lane.Height)),
-            Theme.Chrome);
-        renderer.VerticalLine(BodyArea.Left + Theme.TrackHeaderWidth - 1, lane.Top, lane.Height, Theme.Line);
-        renderer.DrawTextCentered(
-            "V1",
-            new FloatRect(new Vector2f(BodyArea.Left, lane.Top), new Vector2f(Theme.TrackHeaderWidth, lane.Height)),
-            Theme.FontSizeLabel,
-            Theme.TextDim);
 
         renderer.FillRect(lane, Theme.LaneFace);
         renderer.PushClip(lane);
 
-        var start = TimeSpan.Zero;
-        foreach (var clip in _host.Timeline.Clips)
+        for (var track = TrackCount - 1; track >= 0; track--)
         {
-            start += clip.LeadingGap;
-            DrawClip(renderer, clip, start);
-            start += clip.Duration;
+            var row = LaneRect(track);
+            if (row.Top + row.Height < lane.Top || row.Top > lane.Top + lane.Height)
+            {
+                continue;
+            }
+
+            if (row.Top > lane.Top)
+            {
+                renderer.HorizontalLine(row.Left, MathF.Round(row.Top), row.Width, Theme.Line);
+            }
+
+            var start = TimeSpan.Zero;
+            foreach (var clip in _host.Timeline.ClipsOf(track))
+            {
+                start += clip.LeadingGap;
+                DrawClip(renderer, clip, start, row, track > 0);
+                start += clip.Duration;
+            }
         }
 
-        if (_drag == DragMode.MoveClip && _dragToIndex >= 0)
-        {
-            DrawInsertionMarker(renderer);
-        }
-
+        DrawDropPreview(renderer);
         renderer.PopClip();
     }
 
-    private void DrawClip(Renderer renderer, Clip clip, TimeSpan globalStart)
+    private void DrawTrackHeaders(Renderer renderer)
+    {
+        var column = HeaderColumn;
+
+        renderer.FillRect(column, Theme.Chrome);
+        renderer.PushClip(column);
+
+        for (var track = 0; track < TrackCount; track++)
+        {
+            var cell = HeaderCell(track);
+            if (cell.Top + cell.Height < column.Top || cell.Top > column.Top + column.Height)
+            {
+                continue;
+            }
+
+            if (cell.Top > column.Top)
+            {
+                renderer.HorizontalLine(cell.Left, MathF.Round(cell.Top), cell.Width, Theme.Line);
+            }
+
+            renderer.DrawText(
+                I18n.Timeline.TrackLabel(track + 1),
+                cell.Left + 15f,
+                cell.Top + 6f,
+                Theme.FontSizeLabel,
+                _host.SelectedClip is not null && track == _host.SelectedTrackIndex ? Theme.Text : Theme.TextDim,
+                TextFont.SemiBold,
+                TextAlign.Center);
+        }
+
+        foreach (var button in TrackButtons)
+        {
+            if (button.Bounds.Width > 0)
+            {
+                button.Draw(renderer);
+            }
+        }
+
+        renderer.PopClip();
+        renderer.VerticalLine(column.Left + column.Width - 1, column.Top, column.Height, Theme.Line);
+    }
+
+    private void DrawClip(Renderer renderer, Clip clip, TimeSpan globalStart, FloatRect row, bool overlay)
     {
         var lane = LaneBounds;
         var left = TimeToX(globalStart);
@@ -175,22 +312,35 @@ public sealed class TimelinePanel : PanelBase
             return;
         }
 
+        var inset = ClipInset(row.Height);
         var bounds = new FloatRect(
-            new Vector2f(MathF.Round(left), lane.Top + ClipPadding),
-            new Vector2f(Math.Max(2f, MathF.Round(right - left) - 2f), lane.Height - (ClipPadding * 2)));
+            new Vector2f(MathF.Round(left), row.Top + inset),
+            new Vector2f(Math.Max(2f, MathF.Round(right - left) - 2f), row.Height - (inset * 2)));
 
         var selected = _host.SelectedClip is not null && _host.SelectedClip.Id == clip.Id;
         var missing = _host.SourceMissing(clip.SourceId);
         var source = _host.FindSource(clip.SourceId);
 
-        renderer.FillRect(bounds, missing ? Theme.ClipMissing : selected ? Theme.ClipSelected : Theme.ClipFace);
+        renderer.FillRect(bounds, missing
+            ? Theme.ClipMissing
+            : selected
+                ? Theme.ClipSelected
+                : overlay
+                    ? Theme.ClipOverlayFace
+                    : Theme.ClipFace);
 
         if (!missing && source is not null && bounds.Width > 8)
         {
             DrawFilmstrip(renderer, clip, source, bounds);
         }
 
-        renderer.StrokeRect(bounds, missing ? Theme.ClipMissingBorder : selected ? Theme.Accent : Theme.ClipBorder);
+        renderer.StrokeRect(bounds, missing
+            ? Theme.ClipMissingBorder
+            : selected
+                ? Theme.Accent
+                : overlay
+                    ? Theme.ClipOverlayBorder
+                    : Theme.ClipBorder);
 
         renderer.PushClip(bounds);
 
@@ -208,7 +358,7 @@ public sealed class TimelinePanel : PanelBase
 
         var duration = TimeFormat.Seconds(clip.Duration);
         var durationWidth = renderer.MeasureText(duration, Theme.FontSizeLabel, TextFont.Mono);
-        if (durationWidth + 12 < bounds.Width)
+        if (durationWidth + 12 < bounds.Width && bounds.Height > 36)
         {
             var badge = new FloatRect(
                 new Vector2f(bounds.Left + bounds.Width - durationWidth - 9, bounds.Top + bounds.Height - 17),
@@ -276,11 +426,41 @@ public sealed class TimelinePanel : PanelBase
         renderer.PopClip();
     }
 
-    private void DrawInsertionMarker(Renderer renderer)
+    private void DrawDropPreview(Renderer renderer)
     {
-        var lane = LaneBounds;
-        var x = MathF.Round(TimeToX(_host.Timeline.StartOf(_dragToIndex)));
-        renderer.FillRect(x - 1, lane.Top + 4, 2, lane.Height - 8, Theme.Accent);
+        if (_drag != DragMode.MoveClip || _dragClip is null || _dragToTrack < 0)
+        {
+            return;
+        }
+
+        var row = LaneRect(_dragToTrack);
+        var inset = ClipInset(row.Height);
+
+        if (IsReorderDrag)
+        {
+            if (_dragToIndex < 0)
+            {
+                return;
+            }
+
+            var marker = MathF.Round(TimeToX(_host.Timeline.StartOf(_dragToIndex)));
+            renderer.FillRect(marker - 1, row.Top + 4, 2, row.Height - 8, Theme.Accent);
+            return;
+        }
+
+        var left = TimeToX(_dragStart);
+        var right = TimeToX(_dragStart + _dragClip.Duration);
+        var ghost = new FloatRect(
+            new Vector2f(MathF.Round(left), row.Top + inset),
+            new Vector2f(Math.Max(2f, MathF.Round(right - left)), row.Height - (inset * 2)));
+
+        if (_dragToTrack > 0)
+        {
+            renderer.FillRect(ghost, Theme.AccentSoft);
+            renderer.StrokeRect(ghost, Theme.Accent);
+        }
+
+        renderer.FillRect(ghost.Left - 1, row.Top + 4, 2, row.Height - 8, Theme.Accent);
     }
 
     private void DrawPlayhead(Renderer renderer)
@@ -385,6 +565,7 @@ public sealed class TimelinePanel : PanelBase
         var total = _host.Timeline.TotalDuration.TotalSeconds;
         var max = Math.Max(0, total - (visible * 0.5));
         _scrollSeconds = Math.Clamp(_scrollSeconds, 0, max);
+        _laneScroll = LaneGeometry.ClampScroll(_laneScroll, lane.Height, TrackCount);
     }
 
     private double ChooseTickStep()
@@ -400,18 +581,26 @@ public sealed class TimelinePanel : PanelBase
         return TickSteps[^1];
     }
 
-    private (Clip Clip, int Index, FloatRect Bounds)? ClipAt(Vector2f point)
+    private int TrackAt(Vector2f point) =>
+        LaneGeometry.TrackIndexAt(LaneBounds.Height, TrackCount, _laneScroll, point.Y - LaneBounds.Top);
+
+    private ClipHit? ClipAt(Vector2f point)
     {
         var lane = LaneBounds;
-        if (point.Y < lane.Top || point.Y > lane.Top + lane.Height)
+        var track = TrackAt(point);
+        if (track < 0 || point.X < lane.Left)
         {
             return null;
         }
 
+        var row = LaneRect(track);
+        var inset = ClipInset(row.Height);
+        var clips = _host.Timeline.ClipsOf(track);
         var start = TimeSpan.Zero;
-        for (var i = 0; i < _host.Timeline.Clips.Count; i++)
+
+        for (var i = 0; i < clips.Count; i++)
         {
-            var clip = _host.Timeline.Clips[i];
+            var clip = clips[i];
             start += clip.LeadingGap;
 
             var left = TimeToX(start);
@@ -419,9 +608,9 @@ public sealed class TimelinePanel : PanelBase
 
             if (point.X >= left && point.X < right)
             {
-                return (clip, i, new FloatRect(
-                    new Vector2f(left, lane.Top + ClipPadding),
-                    new Vector2f(right - left, lane.Height - (ClipPadding * 2))));
+                return new ClipHit(clip, track, i, new FloatRect(
+                    new Vector2f(left, row.Top + inset),
+                    new Vector2f(right - left, row.Height - (inset * 2))));
             }
 
             start += clip.Duration;
@@ -443,8 +632,18 @@ public sealed class TimelinePanel : PanelBase
         }
 
         var body = BodyArea;
-        if (point.Y < body.Top || point.Y > body.Top + body.Height || point.X < body.Left + Theme.TrackHeaderWidth)
+        if (point.Y < body.Top || point.Y > body.Top + body.Height)
         {
+            return;
+        }
+
+        if (point.X < body.Left + Theme.TrackHeaderWidth)
+        {
+            foreach (var candidate in TrackButtons)
+            {
+                candidate.OnMouseDown(point);
+            }
+
             return;
         }
 
@@ -462,7 +661,7 @@ public sealed class TimelinePanel : PanelBase
             return;
         }
 
-        var (clip, index, bounds) = hit.Value;
+        var (clip, track, index, bounds) = hit.Value;
         var alreadySelected = _host.SelectedClip is not null && _host.SelectedClip.Id == clip.Id;
         _host.SelectClip(clip);
 
@@ -483,8 +682,12 @@ public sealed class TimelinePanel : PanelBase
 
         _drag = DragMode.MoveClip;
         _dragClip = clip;
+        _dragFromTrack = track;
+        _dragToTrack = track;
         _dragFromIndex = index;
         _dragToIndex = index;
+        _dragStart = _host.Timeline.StartOf(clip);
+        _dragGrabOffset = XToTime(point.X) - _dragStart;
     }
 
     private void BeginPlayheadDrag(Vector2f point)
@@ -506,6 +709,14 @@ public sealed class TimelinePanel : PanelBase
 
     public override void OnMouseMove(Vector2f point)
     {
+        if (_drag == DragMode.None)
+        {
+            foreach (var button in TrackButtons)
+            {
+                button.UpdateHover(point);
+            }
+        }
+
         if (_zoom.OnMouseMove(point))
         {
             return;
@@ -523,9 +734,17 @@ public sealed class TimelinePanel : PanelBase
                 break;
 
             case DragMode.MoveClip:
-                _dragToIndex = TargetIndexFor(point);
+                UpdateDropTarget(point);
                 break;
         }
+    }
+
+    private void UpdateDropTarget(Vector2f point)
+    {
+        var track = TrackAt(point);
+        _dragToTrack = track < 0 ? _dragFromTrack : track;
+        _dragStart = LaneGeometry.DropStart(XToTime(point.X), _dragGrabOffset);
+        _dragToIndex = IsReorderDrag ? TargetIndexFor(point) : -1;
     }
 
     private void ApplyTrim(Vector2f point)
@@ -595,24 +814,35 @@ public sealed class TimelinePanel : PanelBase
             return;
         }
 
-        switch (_drag)
+        var handled = false;
+        foreach (var candidate in TrackButtons)
         {
-            case DragMode.Playhead:
-                _host.EndScrub(_wasPlayingBeforeDrag);
-                break;
+            handled |= candidate.OnMouseUp(point);
+        }
 
-            case DragMode.TrimIn:
-            case DragMode.TrimOut:
-                CommitTrim();
-                break;
+        if (!handled)
+        {
+            switch (_drag)
+            {
+                case DragMode.Playhead:
+                    _host.EndScrub(_wasPlayingBeforeDrag);
+                    break;
 
-            case DragMode.MoveClip:
-                CommitReorder();
-                break;
+                case DragMode.TrimIn:
+                case DragMode.TrimOut:
+                    CommitTrim();
+                    break;
+
+                case DragMode.MoveClip:
+                    CommitMove();
+                    break;
+            }
         }
 
         _drag = DragMode.None;
         _dragClip = null;
+        _dragFromTrack = -1;
+        _dragToTrack = -1;
         _dragFromIndex = -1;
         _dragToIndex = -1;
     }
@@ -636,14 +866,29 @@ public sealed class TimelinePanel : PanelBase
         _host.Execute(new TrimClipCommand(_dragClip, newIn, newOut));
     }
 
-    private void CommitReorder()
+    private void CommitMove()
     {
-        if (_dragClip is null || _dragFromIndex < 0 || _dragToIndex < 0 || _dragFromIndex == _dragToIndex)
+        if (_dragClip is null || _dragFromTrack < 0 || _dragToTrack < 0)
         {
             return;
         }
 
-        _host.Execute(new ReorderClipCommand(_dragClip, _dragFromIndex, _dragToIndex));
+        if (IsReorderDrag)
+        {
+            if (_dragToIndex >= 0 && _dragFromIndex >= 0 && _dragToIndex != _dragFromIndex)
+            {
+                _host.Execute(new ReorderClipCommand(_dragClip, _dragFromIndex, _dragToIndex));
+            }
+
+            return;
+        }
+
+        if (_dragToTrack == _dragFromTrack && _dragStart == _host.Timeline.StartOf(_dragClip))
+        {
+            return;
+        }
+
+        _host.MoveClipToTrack(_dragClip, _dragToTrack, _dragStart);
     }
 
     public override void OnScroll(Vector2f point, float delta, bool control)
@@ -654,8 +899,28 @@ public sealed class TimelinePanel : PanelBase
             return;
         }
 
+        var lane = LaneBounds;
+        if (LaneGeometry.MaxScroll(lane.Height, TrackCount) > 0
+            && point.Y >= lane.Top
+            && point.Y <= lane.Top + lane.Height)
+        {
+            _laneScroll = LaneGeometry.ClampScroll(
+                _laneScroll - (delta * LaneWheelStep),
+                lane.Height,
+                TrackCount);
+            return;
+        }
+
         _scrollSeconds -= delta * (60f / _pixelsPerSecond);
         ClampScroll();
+    }
+
+    public override void OnMouseLeave()
+    {
+        foreach (var button in TrackButtons)
+        {
+            button.UpdateHover(new Vector2f(-1, -1));
+        }
     }
 
     private TimeSpan ClampToTimeline(TimeSpan value) => Clamp(value, TimeSpan.Zero, _host.Timeline.TotalDuration);

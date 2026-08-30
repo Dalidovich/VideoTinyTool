@@ -36,7 +36,9 @@ public static class ShortcutReference
             new ShortcutEntry("Delete", I18n.Help.Remove),
             new ShortcutEntry("Shift+Delete", I18n.Help.RippleDelete),
             new ShortcutEntry("Ctrl+Z", I18n.Help.Undo),
-            new ShortcutEntry("Ctrl+Shift+Z / Ctrl+Y", I18n.Help.Redo)
+            new ShortcutEntry("Ctrl+Shift+Z / Ctrl+Y", I18n.Help.Redo),
+            new ShortcutEntry("Ctrl+T", I18n.Help.AddTrack),
+            new ShortcutEntry("Ctrl+Shift+T", I18n.Help.RemoveTrack)
         ]),
         new ShortcutGroup(I18n.Help.Files,
         [

@@ -1,4 +1,4 @@
-﻿using VideoTinyTool.Application;
+using VideoTinyTool.Application;
 using VideoTinyTool.Commands;
 using VideoTinyTool.Domain;
 using VideoTinyTool.Media;
@@ -14,6 +14,8 @@ public interface IEditorHost
     MediaSource? SelectedSource { get; }
 
     Clip? SelectedClip { get; }
+
+    int SelectedTrackIndex { get; }
 
     PreviewPlayer Player { get; }
 
@@ -34,6 +36,12 @@ public interface IEditorHost
     void AppendSourceToTimeline(MediaSource source);
 
     void RemoveSource(MediaSource source);
+
+    void AddTrack();
+
+    void RemoveTrack(int index);
+
+    void MoveClipToTrack(Clip clip, int trackIndex, TimeSpan start);
 
     void Execute(IEditCommand command);
 

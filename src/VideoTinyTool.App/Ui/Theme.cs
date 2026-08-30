@@ -35,6 +35,8 @@ public static class Theme
     public static readonly Color ClipFaceAlt = Rgb(0x3E6577);
     public static readonly Color ClipSelected = Rgb(0x4E7C90);
     public static readonly Color ClipBorder = Rgb(0x24404E);
+    public static readonly Color ClipOverlayFace = Rgb(0x4B3A63);
+    public static readonly Color ClipOverlayBorder = Rgb(0x33264A);
     public static readonly Color ClipMissing = Rgb(0x5A2B2B);
     public static readonly Color ClipMissingBorder = Rgb(0x8A4040);
 

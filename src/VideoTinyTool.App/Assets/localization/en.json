@@ -37,6 +37,8 @@
     "zoomAtCursor": "Zoom around the cursor",
     "scrollTimeline": "Scroll the timeline",
     "showHelp": "Open this list",
+    "addTrack": "Add a track",
+    "removeTrack": "Remove the selected clip’s track",
     "confirm": "Confirm",
     "dismiss": "Cancel or close"
   },
@@ -65,6 +67,9 @@
     "outPrefix": "OUT ",
     "noTimecode": "--:--.---",
     "zoom": "Zoom",
+    "trackLabel": "V{0}",
+    "addTrack": "+",
+    "removeTrack": "×",
     "clipCount": {
       "one": "1 clip",
       "other": "{0} clips"

@@ -121,6 +121,8 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     public Clip? SelectedClip => _selectedClip;
 
+    public int SelectedTrackIndex => _selectedClip is null ? 0 : Math.Max(0, _timeline.TrackIndexOf(_selectedClip));
+
     public PreviewPlayer Player => _player;
 
     public ThumbnailService Thumbnails => _thumbnails;
@@ -368,6 +370,14 @@ public sealed class EditorApplication : IEditorHost, IDisposable
                 _timelinePanel.ZoomBy(1f / 1.25f);
                 break;
 
+            case EditorCommand.AddTrack:
+                AddTrack();
+                break;
+
+            case EditorCommand.RemoveTrack:
+                RemoveTrack(SelectedTrackIndex);
+                break;
+
             case EditorCommand.Help:
                 ShowShortcuts();
                 break;
@@ -536,6 +546,29 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         _sourceIndex[source.Id] = source;
         _selectedSource ??= source;
     }
+
+    public void AddTrack()
+    {
+        if (_timeline.Tracks.Count >= Domain.Timeline.MaxTracks)
+        {
+            return;
+        }
+
+        Execute(new AddTrackCommand());
+    }
+
+    public void RemoveTrack(int index)
+    {
+        if (index <= 0 || index >= _timeline.Tracks.Count)
+        {
+            return;
+        }
+
+        Execute(new RemoveTrackCommand(index));
+    }
+
+    public void MoveClipToTrack(Clip clip, int trackIndex, TimeSpan start) =>
+        Execute(new MoveClipToTrackCommand(clip, trackIndex, start));
 
     public void Execute(IEditCommand command)
     {
@@ -714,12 +747,12 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             return;
         }
 
-        var index = _timeline.IndexOf(clip);
+        var trackIndex = Math.Max(0, _timeline.TrackIndexOf(clip));
+        var index = _timeline.IndexOf(trackIndex, clip);
         Execute(new RemoveClipCommand(clip, ripple));
 
-        _selectedClip = _timeline.Clips.Count == 0
-            ? null
-            : _timeline.Clips[Math.Clamp(index, 0, _timeline.Clips.Count - 1)];
+        var clips = _timeline.ClipsOf(trackIndex);
+        _selectedClip = clips.Count == 0 ? null : clips[Math.Clamp(index, 0, clips.Count - 1)];
     }
 
     public void TrimSelectedToPlayhead(bool trimIn)
@@ -778,7 +811,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     private void AfterTimelineChanged()
     {
-        if (_selectedClip is not null && _timeline.IndexOf(_selectedClip) < 0)
+        if (_selectedClip is not null && _timeline.TrackIndexOf(_selectedClip) < 0)
         {
             _selectedClip = null;
         }
