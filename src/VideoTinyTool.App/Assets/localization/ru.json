@@ -47,7 +47,12 @@
     "emptyTimeline": "Таймлайн пуст",
     "preparingFrame": "Готовим кадр…",
     "format": "{0}×{1} · {2} fps",
-    "rateBadge": "{0}×"
+    "rateBadge": "{0}×",
+    "overlayHint": "Перетащите — сдвиг · углы — размер",
+    "overlayOpacity": "Непрозрачность",
+    "overlayVolume": "Громкость",
+    "overlayReset": "Сбросить",
+    "overlayPercent": "{0}%"
   },
   "sources": {
     "title": "Источники",

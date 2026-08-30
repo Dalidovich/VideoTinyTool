@@ -43,6 +43,8 @@ public interface IEditorHost
 
     void MoveClipToTrack(Clip clip, int trackIndex, TimeSpan start);
 
+    void SetOverlayTransform(Clip clip, OverlayTransform transform);
+
     void Execute(IEditCommand command);
 
     void SeekTo(TimeSpan position, bool scrubbing);

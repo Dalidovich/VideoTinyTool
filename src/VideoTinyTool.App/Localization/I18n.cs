@@ -79,6 +79,14 @@ public static class I18n
 
         public static string RateBadge(double rate) =>
             _catalog.Format("preview.rateBadge", rate.ToString("0.#", CultureInfo.InvariantCulture));
+
+        public static string OverlayHint => _catalog.Text("preview.overlayHint");
+        public static string OverlayOpacity => _catalog.Text("preview.overlayOpacity");
+        public static string OverlayVolume => _catalog.Text("preview.overlayVolume");
+        public static string OverlayReset => _catalog.Text("preview.overlayReset");
+
+        public static string OverlayPercent(float value) =>
+            _catalog.Format("preview.overlayPercent", (int)MathF.Round(value * 100f));
     }
 
     public static class Sources

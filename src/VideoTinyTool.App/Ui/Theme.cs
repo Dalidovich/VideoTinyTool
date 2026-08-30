@@ -50,6 +50,7 @@ public static class Theme
     public const int RulerHeight = 22;
     public const int TrackHeaderWidth = 46;
     public const int TransportHeight = 34;
+    public const int OverlayBarHeight = 30;
 
     public const int SourceRowHeight = 47;
     public const int SourceThumbWidth = 58;

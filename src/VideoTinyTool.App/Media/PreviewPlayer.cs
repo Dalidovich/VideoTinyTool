@@ -5,7 +5,7 @@ using VideoTinyTool.Domain;
 
 namespace VideoTinyTool.Media;
 
-public readonly record struct OverlayFrame(Texture Texture, OverlayTransform Transform, double SourceAspect);
+public readonly record struct OverlayFrame(int TrackIndex, Texture Texture, OverlayTransform Transform, double SourceAspect);
 
 public sealed class PreviewPlayer : IDisposable
 {
@@ -86,7 +86,7 @@ public sealed class PreviewPlayer : IDisposable
                 var texture = track.Texture;
                 if (texture is not null)
                 {
-                    _overlayFrames.Add(new OverlayFrame(texture, track.Transform, track.Aspect));
+                    _overlayFrames.Add(new OverlayFrame(track.TrackIndex, texture, track.Transform, track.Aspect));
                 }
             }
 

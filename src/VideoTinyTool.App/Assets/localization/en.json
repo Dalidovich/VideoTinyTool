@@ -47,7 +47,12 @@
     "emptyTimeline": "Timeline is empty",
     "preparingFrame": "Preparing frame…",
     "format": "{0}×{1} · {2} fps",
-    "rateBadge": "{0}×"
+    "rateBadge": "{0}×",
+    "overlayHint": "Drag to move · corners to resize",
+    "overlayOpacity": "Opacity",
+    "overlayVolume": "Volume",
+    "overlayReset": "Reset",
+    "overlayPercent": "{0}%"
   },
   "sources": {
     "title": "Sources",

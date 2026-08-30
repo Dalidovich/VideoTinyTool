@@ -570,6 +570,9 @@ public sealed class EditorApplication : IEditorHost, IDisposable
     public void MoveClipToTrack(Clip clip, int trackIndex, TimeSpan start) =>
         Execute(new MoveClipToTrackCommand(clip, trackIndex, start));
 
+    public void SetOverlayTransform(Clip clip, OverlayTransform transform) =>
+        Execute(new SetOverlayTransformCommand(clip, transform));
+
     public void Execute(IEditCommand command)
     {
         _history.Execute(command);
