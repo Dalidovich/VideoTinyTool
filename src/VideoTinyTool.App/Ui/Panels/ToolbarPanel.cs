@@ -1,6 +1,7 @@
 using SFML.Graphics;
 using SFML.System;
 using SFML.Window;
+using VideoTinyTool.Localization;
 using VideoTinyTool.Ui.Widgets;
 
 namespace VideoTinyTool.Ui.Panels;
@@ -8,12 +9,12 @@ namespace VideoTinyTool.Ui.Panels;
 public sealed class ToolbarPanel : PanelBase
 {
     private readonly IEditorHost _host;
-    private readonly Button _import = new("Import…");
-    private readonly Button _split = new("Split");
-    private readonly Button _remove = new("Remove");
-    private readonly Button _undo = new("Undo", ButtonStyle.Ghost);
-    private readonly Button _redo = new("Redo", ButtonStyle.Ghost);
-    private readonly Button _export = new("Export…", ButtonStyle.Accent);
+    private readonly Button _import = new(I18n.Toolbar.Import);
+    private readonly Button _split = new(I18n.Toolbar.Split);
+    private readonly Button _remove = new(I18n.Toolbar.Remove);
+    private readonly Button _undo = new(I18n.Toolbar.Undo, ButtonStyle.Ghost);
+    private readonly Button _redo = new(I18n.Toolbar.Redo, ButtonStyle.Ghost);
+    private readonly Button _export = new(I18n.Toolbar.Export, ButtonStyle.Accent);
 
     private float _separatorX;
 
@@ -48,7 +49,7 @@ public sealed class ToolbarPanel : PanelBase
         const float height = 24f;
 
         var top = Bounds.Top + ((Bounds.Height - height) / 2f);
-        var x = Bounds.Left + 12f + renderer.MeasureText("VideoTinyTool", Theme.FontSizeBrand, TextFont.SemiBold) + 18f;
+        var x = Bounds.Left + 12f + renderer.MeasureText(I18n.Brand.Full, Theme.FontSizeBrand, TextFont.SemiBold) + 18f;
 
         foreach (var button in new[] { _import, _split, _remove })
         {
@@ -91,9 +92,9 @@ public sealed class ToolbarPanel : PanelBase
 
         var brandY = Bounds.Top + 10f;
         var x = Bounds.Left + 12f;
-        x += renderer.DrawText("Video", x, brandY, Theme.FontSizeBrand, Theme.Text, TextFont.SemiBold);
-        x += renderer.DrawText("Tiny", x, brandY, Theme.FontSizeBrand, Theme.Accent, TextFont.SemiBold);
-        renderer.DrawText("Tool", x, brandY, Theme.FontSizeBrand, Theme.Text, TextFont.SemiBold);
+        x += renderer.DrawText(I18n.Brand.Head, x, brandY, Theme.FontSizeBrand, Theme.Text, TextFont.SemiBold);
+        x += renderer.DrawText(I18n.Brand.Accent, x, brandY, Theme.FontSizeBrand, Theme.Accent, TextFont.SemiBold);
+        renderer.DrawText(I18n.Brand.Tail, x, brandY, Theme.FontSizeBrand, Theme.Text, TextFont.SemiBold);
 
         renderer.FillRect(_separatorX, Bounds.Top + 10f, 1, 18f, Theme.LineStrong);
 

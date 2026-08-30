@@ -1,6 +1,6 @@
-using System.Globalization;
 using SFML.Graphics;
 using SFML.System;
+using VideoTinyTool.Localization;
 
 namespace VideoTinyTool.Ui.Widgets;
 
@@ -32,7 +32,7 @@ public sealed class ProgressDialog : ModalDialog
             Theme.Accent);
 
         renderer.DrawText(
-            (Progress * 100).ToString("0", CultureInfo.InvariantCulture) + " %",
+            I18n.Dialogs.Percent(Progress),
             left + width,
             barTop + BarHeight + 6f,
             Theme.FontSizeSmall,

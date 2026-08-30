@@ -1,5 +1,6 @@
 using System.Runtime.Versioning;
 using VideoTinyTool.Application;
+using VideoTinyTool.Localization;
 using VideoTinyTool.Platform;
 
 namespace VideoTinyTool;
@@ -13,6 +14,7 @@ internal class Program
         ConsoleWindow.Hide();
 
         var settings = SettingsLoader.LoadOrCreate(AppPaths.SettingsFile);
+        I18n.Use(LocalizationCatalog.Load(settings.Ui.Language));
 
         using var application = new EditorApplication(settings);
         application.Run();

@@ -1,6 +1,20 @@
 using System.Text.Json.Serialization;
+using VideoTinyTool.Localization;
 
 namespace VideoTinyTool.Application;
+
+public enum SettingsLoadFailure
+{
+    Unreadable,
+    NotCreated
+}
+
+public sealed record SettingsLoadIssue(SettingsLoadFailure Kind, string Detail);
+
+public sealed class UiSettings
+{
+    public string Language { get; set; } = LocalizationCatalog.DefaultLanguage;
+}
 
 public sealed class ExportSettings
 {
@@ -32,9 +46,10 @@ public sealed class AppSettings
     public ExportSettings Export { get; set; } = new();
     public PreviewSettings Preview { get; set; } = new();
     public WindowSettings Window { get; set; } = new();
+    public UiSettings Ui { get; set; } = new();
 
     [JsonIgnore]
-    public string? LoadWarning { get; set; }
+    public SettingsLoadIssue? LoadIssue { get; set; }
 
     public void Sanitize()
     {
@@ -53,6 +68,17 @@ public sealed class AppSettings
 
         Window.Width = Math.Clamp(Window.Width <= 0 ? 1600 : Window.Width, 1100, 7680);
         Window.Height = Math.Clamp(Window.Height <= 0 ? 900 : Window.Height, 700, 4320);
+
+        Ui.Language = SanitizeLanguage(Ui.Language);
+    }
+
+    private static string SanitizeLanguage(string? value)
+    {
+        var language = (value ?? string.Empty).Trim().ToLowerInvariant();
+        var usable = language.Length is > 0 and <= 16
+                     && language.All(character => char.IsAsciiLetterOrDigit(character) || character == '-');
+
+        return usable ? language : LocalizationCatalog.DefaultLanguage;
     }
 
     private static string Fallback(string? value, string standard) =>

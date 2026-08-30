@@ -1,0 +1,105 @@
+{
+  "brand": {
+    "head": "Video",
+    "accent": "Tiny",
+    "tail": "Tool"
+  },
+  "toolbar": {
+    "import": "Import…",
+    "split": "Split",
+    "remove": "Remove",
+    "undo": "Undo",
+    "redo": "Redo",
+    "export": "Export…"
+  },
+  "preview": {
+    "title": "Result",
+    "emptyTimeline": "Timeline is empty",
+    "preparingFrame": "Preparing frame…",
+    "format": "{0}×{1} · {2} fps",
+    "rateBadge": "{0}×"
+  },
+  "sources": {
+    "title": "Sources",
+    "empty": "No sources yet — use Import…",
+    "fileMissing": "file is missing",
+    "noAudio": " · no audio",
+    "meta": "{0} · {1}×{2} · {3}",
+    "fileCount": {
+      "one": "1 file",
+      "other": "{0} files"
+    }
+  },
+  "timeline": {
+    "title": "Timeline",
+    "missingSource": "missing source",
+    "inPrefix": "IN  ",
+    "outPrefix": "OUT ",
+    "noTimecode": "--:--.---",
+    "zoom": "Zoom",
+    "clipCount": {
+      "one": "1 clip",
+      "other": "{0} clips"
+    }
+  },
+  "dialogs": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "removeSourceTitle": "Remove source",
+    "removeSourceConfirm": "Remove",
+    "removeSourceMessage": {
+      "one": "{0} is used by one clip on the timeline. Removing the source removes that clip too.",
+      "other": "{0} is used by {1} clips on the timeline. Removing the source removes those clips too."
+    },
+    "ffmpegMissingTitle": "ffmpeg is missing",
+    "missingSourcesTitle": "Sources are missing",
+    "missingSourcesMessage": "These files are no longer on disk and the timeline cannot be exported:\n{0}",
+    "importFailedTitle": {
+      "one": "A file could not be imported",
+      "other": "Some files could not be imported"
+    },
+    "importFailure": "{0} — {1}",
+    "exportingTitle": "Exporting",
+    "exportFinishedTitle": "Export finished",
+    "exportCancelledTitle": "Export cancelled",
+    "exportCancelledMessage": "The partial output file was removed.",
+    "exportFailedTitle": "Export failed",
+    "exportFailedFallback": "ffmpeg reported an unknown error.",
+    "exportRunningTitle": "Export is running",
+    "exportRunningMessage": "Closing now stops ffmpeg and deletes the unfinished output file. Close anyway?",
+    "stopAndClose": "Stop and close",
+    "keepExporting": "Keep exporting",
+    "settingsTitle": "settings.json",
+    "fontsTitle": "Fonts",
+    "localizationTitle": "Localization",
+    "percent": "{0} %"
+  },
+  "fileDialogs": {
+    "importTitle": "Import video files",
+    "exportTitle": "Export timeline",
+    "videoFiles": "Video files",
+    "allFiles": "All files",
+    "containerVideo": "{0} video",
+    "defaultExportName": "timeline.{0}"
+  },
+  "startup": {
+    "noUsableFont": "No usable font was found. Expected the assets\fonts folder next to the executable.",
+    "missingBinaries": "Required binaries were not found:\n{0}",
+    "missingFonts": "These font files are missing next to the executable, system fonts are used instead:\n{0}",
+    "settingsUnreadable": "settings.json could not be read, defaults are used.\n{0}",
+    "settingsNotCreated": "settings.json could not be created next to the executable.\n{0}",
+    "localizationMissing": "The localization file for “{0}” was not found at {1}. The built-in English text is used.",
+    "localizationUnreadable": "The localization file {0} could not be read, the built-in English text is used.\n{1}"
+  },
+  "probe": {
+    "fileNotFound": "File not found.",
+    "ffprobeNotStarted": "ffprobe could not be started.",
+    "noStreams": "ffprobe reported no streams.",
+    "noVideoStream": "The file has no video stream.",
+    "noFrameSize": "The video stream has no usable frame size.",
+    "noDuration": "The file has no readable duration.",
+    "ffprobeNotFound": "ffprobe.exe was not found at {0}.",
+    "ffprobeExited": "ffprobe exited with code {0}.",
+    "unreadableOutput": "ffprobe returned unreadable output: {0}"
+  }
+}

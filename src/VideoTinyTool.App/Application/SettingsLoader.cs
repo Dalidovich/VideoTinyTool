@@ -23,7 +23,9 @@ public static class SettingsLoader
         {
             var created = new AppSettings();
             TryWrite(path, created, out var writeError);
-            created.LoadWarning = writeError;
+            created.LoadIssue = writeError is null
+                ? null
+                : new SettingsLoadIssue(SettingsLoadFailure.NotCreated, writeError);
             created.Sanitize();
             return created;
         }
@@ -35,6 +37,7 @@ public static class SettingsLoader
             parsed.Export ??= new ExportSettings();
             parsed.Preview ??= new PreviewSettings();
             parsed.Window ??= new WindowSettings();
+            parsed.Ui ??= new UiSettings();
             parsed.Sanitize();
             return parsed;
         }
@@ -42,7 +45,7 @@ public static class SettingsLoader
         {
             var defaults = new AppSettings
             {
-                LoadWarning = $"settings.json could not be read, defaults are used.\n{ex.Message}"
+                LoadIssue = new SettingsLoadIssue(SettingsLoadFailure.Unreadable, ex.Message)
             };
             defaults.Sanitize();
             return defaults;
@@ -58,7 +61,7 @@ public static class SettingsLoader
         }
         catch (Exception ex)
         {
-            error = $"settings.json could not be created next to the executable.\n{ex.Message}";
+            error = ex.Message;
         }
     }
 }

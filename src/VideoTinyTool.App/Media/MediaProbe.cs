@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using VideoTinyTool.Application;
 using VideoTinyTool.Domain;
+using VideoTinyTool.Localization;
 
 namespace VideoTinyTool.Media;
 
@@ -20,12 +21,12 @@ public static class MediaProbe
     {
         if (!File.Exists(path))
         {
-            throw new ProbeFailedException("File not found.");
+            throw new ProbeFailedException(I18n.Probe.FileNotFound);
         }
 
         if (!FFmpegRuntime.FFprobeAvailable)
         {
-            throw new ProbeFailedException($"ffprobe.exe was not found at {AppPaths.FFprobeExecutable}.");
+            throw new ProbeFailedException(I18n.Probe.FFprobeNotFound(AppPaths.FFprobeExecutable));
         }
 
         var startInfo = new ProcessStartInfo
@@ -48,7 +49,7 @@ public static class MediaProbe
         startInfo.ArgumentList.Add(path);
 
         using var process = Process.Start(startInfo)
-                            ?? throw new ProbeFailedException("ffprobe could not be started.");
+                            ?? throw new ProbeFailedException(I18n.Probe.FFprobeNotStarted);
 
         var json = process.StandardOutput.ReadToEnd();
         var error = process.StandardError.ReadToEnd();
@@ -57,7 +58,7 @@ public static class MediaProbe
         if (process.ExitCode != 0)
         {
             throw new ProbeFailedException(string.IsNullOrWhiteSpace(error)
-                ? $"ffprobe exited with code {process.ExitCode}."
+                ? I18n.Probe.FFprobeExited(process.ExitCode)
                 : error.Trim());
         }
 
@@ -73,7 +74,7 @@ public static class MediaProbe
         }
         catch (JsonException ex)
         {
-            throw new ProbeFailedException($"ffprobe returned unreadable output: {ex.Message}");
+            throw new ProbeFailedException(I18n.Probe.UnreadableOutput(ex.Message));
         }
 
         using (document)
@@ -81,7 +82,7 @@ public static class MediaProbe
             var root = document.RootElement;
             if (!root.TryGetProperty("streams", out var streams) || streams.ValueKind != JsonValueKind.Array)
             {
-                throw new ProbeFailedException("ffprobe reported no streams.");
+                throw new ProbeFailedException(I18n.Probe.NoStreams);
             }
 
             JsonElement? video = null;
@@ -102,7 +103,7 @@ public static class MediaProbe
 
             if (video is null)
             {
-                throw new ProbeFailedException("The file has no video stream.");
+                throw new ProbeFailedException(I18n.Probe.NoVideoStream);
             }
 
             var videoStream = video.Value;
@@ -110,13 +111,13 @@ public static class MediaProbe
             var height = ReadInt(videoStream, "height") ?? 0;
             if (width <= 0 || height <= 0)
             {
-                throw new ProbeFailedException("The video stream has no usable frame size.");
+                throw new ProbeFailedException(I18n.Probe.NoFrameSize);
             }
 
             var duration = ReadDuration(videoStream, root);
             if (duration <= TimeSpan.Zero)
             {
-                throw new ProbeFailedException("The file has no readable duration.");
+                throw new ProbeFailedException(I18n.Probe.NoDuration);
             }
 
             return new MediaSource(

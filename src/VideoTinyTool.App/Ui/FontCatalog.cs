@@ -1,5 +1,6 @@
 using SFML.Graphics;
 using VideoTinyTool.Application;
+using VideoTinyTool.Localization;
 
 namespace VideoTinyTool.Ui;
 
@@ -46,14 +47,12 @@ public sealed class FontCatalog : IDisposable
 
         if (regular is null)
         {
-            throw new InvalidOperationException(
-                "No usable font was found. Expected the fonts folder next to the executable.");
+            throw new InvalidOperationException(I18n.Startup.NoUsableFont);
         }
 
         var warning = missing.Count == 0
             ? null
-            : "These font files are missing next to the executable, system fonts are used instead:\n"
-              + string.Join("\n", missing);
+            : I18n.Startup.MissingFonts(missing);
 
         return new FontCatalog(regular, semiBold!, mono!, warning);
     }

@@ -1,0 +1,109 @@
+{
+  "brand": {
+    "head": "Video",
+    "accent": "Tiny",
+    "tail": "Tool"
+  },
+  "toolbar": {
+    "import": "Импорт…",
+    "split": "Разрезать",
+    "remove": "Удалить",
+    "undo": "Отменить",
+    "redo": "Повторить",
+    "export": "Экспорт…"
+  },
+  "preview": {
+    "title": "Результат",
+    "emptyTimeline": "Таймлайн пуст",
+    "preparingFrame": "Готовим кадр…",
+    "format": "{0}×{1} · {2} fps",
+    "rateBadge": "{0}×"
+  },
+  "sources": {
+    "title": "Источники",
+    "empty": "Источников пока нет — нажмите «Импорт…»",
+    "fileMissing": "файл не найден",
+    "noAudio": " · без звука",
+    "meta": "{0} · {1}×{2} · {3}",
+    "fileCount": {
+      "one": "{0} файл",
+      "few": "{0} файла",
+      "many": "{0} файлов"
+    }
+  },
+  "timeline": {
+    "title": "Таймлайн",
+    "missingSource": "источник не найден",
+    "inPrefix": "IN  ",
+    "outPrefix": "OUT ",
+    "noTimecode": "--:--.---",
+    "zoom": "Масштаб",
+    "clipCount": {
+      "one": "{0} клип",
+      "few": "{0} клипа",
+      "many": "{0} клипов"
+    }
+  },
+  "dialogs": {
+    "ok": "ОК",
+    "cancel": "Отмена",
+    "removeSourceTitle": "Удаление источника",
+    "removeSourceConfirm": "Удалить",
+    "removeSourceMessage": {
+      "one": "{0} используется в одном клипе на таймлайне. Вместе с источником уйдёт и этот клип.",
+      "few": "{0} используется в {1} клипах на таймлайне. Вместе с источником уйдут и эти клипы.",
+      "many": "{0} используется в {1} клипах на таймлайне. Вместе с источником уйдут и эти клипы."
+    },
+    "ffmpegMissingTitle": "ffmpeg не найден",
+    "missingSourcesTitle": "Источники не найдены",
+    "missingSourcesMessage": "Этих файлов больше нет на диске, таймлайн нельзя экспортировать:\n{0}",
+    "importFailedTitle": {
+      "one": "Файл не удалось импортировать",
+      "few": "Некоторые файлы не удалось импортировать",
+      "many": "Некоторые файлы не удалось импортировать"
+    },
+    "importFailure": "{0} — {1}",
+    "exportingTitle": "Экспорт",
+    "exportFinishedTitle": "Экспорт завершён",
+    "exportCancelledTitle": "Экспорт отменён",
+    "exportCancelledMessage": "Недописанный файл удалён.",
+    "exportFailedTitle": "Экспорт не удался",
+    "exportFailedFallback": "ffmpeg сообщил о неизвестной ошибке.",
+    "exportRunningTitle": "Идёт экспорт",
+    "exportRunningMessage": "Закрытие остановит ffmpeg и удалит недописанный файл. Всё равно закрыть?",
+    "stopAndClose": "Остановить и закрыть",
+    "keepExporting": "Продолжить экспорт",
+    "settingsTitle": "settings.json",
+    "fontsTitle": "Шрифты",
+    "localizationTitle": "Локализация",
+    "percent": "{0} %"
+  },
+  "fileDialogs": {
+    "importTitle": "Импорт видеофайлов",
+    "exportTitle": "Экспорт таймлайна",
+    "videoFiles": "Видеофайлы",
+    "allFiles": "Все файлы",
+    "containerVideo": "Видео {0}",
+    "defaultExportName": "timeline.{0}"
+  },
+  "startup": {
+    "noUsableFont": "Не найден ни один пригодный шрифт. Папка assets\fonts должна лежать рядом с исполняемым файлом.",
+    "missingBinaries": "Не найдены обязательные программы:\n{0}",
+    "missingFonts": "Этих файлов шрифтов нет рядом с исполняемым файлом, используются системные шрифты:\n{0}",
+    "settingsUnreadable": "Не удалось прочитать settings.json, используются значения по умолчанию.\n{0}",
+    "settingsNotCreated": "Не удалось создать settings.json рядом с исполняемым файлом.\n{0}",
+    "localizationMissing": "Файл локализации для «{0}» не найден: {1}. Используется встроенный английский текст.",
+    "localizationUnreadable": "Не удалось прочитать файл локализации {0}, используется встроенный английский текст.\n{1}"
+  },
+  "probe": {
+    "fileNotFound": "Файл не найден.",
+    "ffprobeNotStarted": "Не удалось запустить ffprobe.",
+    "noStreams": "ffprobe не сообщил ни об одном потоке.",
+    "noVideoStream": "В файле нет видеопотока.",
+    "noFrameSize": "У видеопотока нет пригодного размера кадра.",
+    "noDuration": "У файла нет читаемой длительности.",
+    "ffprobeNotFound": "ffprobe.exe не найден: {0}.",
+    "ffprobeExited": "ffprobe завершился с кодом {0}.",
+    "unreadableOutput": "ffprobe вернул нечитаемый вывод: {0}"
+  }
+}

@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using VideoTinyTool.Localization;
 
 namespace VideoTinyTool.Platform;
 
@@ -68,12 +69,12 @@ public static class NativeFileDialog
                 lStructSize = Marshal.SizeOf<OpenFileName>(),
                 hwndOwner = owner,
                 lpstrFilter = BuildFilter(
-                    ("Video files", "*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v;*.mpg;*.mpeg;*.wmv;*.ts;*.mts;*.m2ts;*.flv"),
-                    ("All files", "*.*")),
+                    (I18n.FileDialogs.VideoFiles, "*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v;*.mpg;*.mpeg;*.wmv;*.ts;*.mts;*.m2ts;*.flv"),
+                    (I18n.FileDialogs.AllFiles, "*.*")),
                 nFilterIndex = 1,
                 lpstrFile = buffer,
                 nMaxFile = MaxMultiSelectBuffer,
-                lpstrTitle = "Import video files",
+                lpstrTitle = I18n.FileDialogs.ImportTitle,
                 Flags = OfnExplorer | OfnAllowMultiSelect | OfnFileMustExist | OfnPathMustExist
                         | OfnHideReadOnly | OfnNoChangeDir | OfnReadOnly
             };
@@ -100,11 +101,11 @@ public static class NativeFileDialog
             {
                 lStructSize = Marshal.SizeOf<OpenFileName>(),
                 hwndOwner = owner,
-                lpstrFilter = BuildFilter(($"{container.ToUpperInvariant()} video", $"*.{container}"), ("All files", "*.*")),
+                lpstrFilter = BuildFilter((I18n.FileDialogs.ContainerVideo(container), $"*.{container}"), (I18n.FileDialogs.AllFiles, "*.*")),
                 nFilterIndex = 1,
                 lpstrFile = buffer,
                 nMaxFile = 1024,
-                lpstrTitle = "Export timeline",
+                lpstrTitle = I18n.FileDialogs.ExportTitle,
                 lpstrDefExt = container,
                 Flags = OfnExplorer | OfnOverwritePrompt | OfnPathMustExist | OfnHideReadOnly | OfnNoChangeDir
             };

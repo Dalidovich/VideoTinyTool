@@ -1,7 +1,7 @@
-﻿using System.Globalization;
-using SFML.Graphics;
+﻿using SFML.Graphics;
 using SFML.System;
 using SFML.Window;
+using VideoTinyTool.Localization;
 using VideoTinyTool.Ui.Widgets;
 
 namespace VideoTinyTool.Ui.Panels;
@@ -81,14 +81,12 @@ public sealed class PreviewPanel : PanelBase
     {
         renderer.FillRect(Bounds, Theme.Sunk);
 
-        var meta = string.Format(
-            CultureInfo.InvariantCulture,
-            "{0}×{1} · {2} fps",
+        var meta = I18n.Preview.Format(
             _host.Settings.Export.Width,
             _host.Settings.Export.Height,
             _host.Settings.Export.FrameRate);
 
-        DrawHeader(renderer, "Result", meta);
+        DrawHeader(renderer, I18n.Preview.Title, meta);
         DrawFrame(renderer);
         DrawTransport(renderer);
     }
@@ -100,7 +98,7 @@ public sealed class PreviewPanel : PanelBase
 
         if (_host.Timeline.Clips.Count == 0)
         {
-            renderer.DrawTextCentered("Timeline is empty", frame, Theme.FontSizeBody, Theme.TextFaint);
+            renderer.DrawTextCentered(I18n.Preview.EmptyTimeline, frame, Theme.FontSizeBody, Theme.TextFaint);
             return;
         }
 
@@ -112,7 +110,7 @@ public sealed class PreviewPanel : PanelBase
         var texture = _host.Player.CurrentTexture;
         if (texture is null)
         {
-            renderer.DrawTextCentered("Preparing frame…", frame, Theme.FontSizeBody, Theme.TextFaint);
+            renderer.DrawTextCentered(I18n.Preview.PreparingFrame, frame, Theme.FontSizeBody, Theme.TextFaint);
             return;
         }
 
@@ -146,7 +144,7 @@ public sealed class PreviewPanel : PanelBase
 
             renderer.FillRect(badge, Theme.Shade);
             renderer.DrawTextCentered(
-                _host.Player.Rate.ToString("0.#", CultureInfo.InvariantCulture) + "×",
+                I18n.Preview.RateBadge(_host.Player.Rate),
                 badge,
                 Theme.FontSizeLabel,
                 Theme.Accent,

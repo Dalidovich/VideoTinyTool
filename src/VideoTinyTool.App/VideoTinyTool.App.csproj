@@ -25,10 +25,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="Resources\fonts\**">
-      <Link>fonts\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    <None Include="Assets\**">
+      <Link>assets\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <EmbeddedResource Include="Assets\localization\en.json">
+      <LogicalName>localization/en.json</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <Target Name="EmbedNativeLibraries" AfterTargets="ResolveReferences" BeforeTargets="PrepareResources">

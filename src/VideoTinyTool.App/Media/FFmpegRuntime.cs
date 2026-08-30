@@ -1,5 +1,6 @@
 using NReco.VideoConverter;
 using VideoTinyTool.Application;
+using VideoTinyTool.Localization;
 
 namespace VideoTinyTool.Media;
 
@@ -26,7 +27,7 @@ public static class FFmpegRuntime
                 missing.Add(AppPaths.FFprobeExecutable);
             }
 
-            return "Required binaries were not found:\n" + string.Join("\n", missing);
+            return I18n.Startup.MissingBinaries(missing);
         }
     }
 

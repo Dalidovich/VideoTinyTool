@@ -3,6 +3,7 @@ using SFML.System;
 using SFML.Window;
 using VideoTinyTool.Commands;
 using VideoTinyTool.Domain;
+using VideoTinyTool.Localization;
 using VideoTinyTool.Ui.Widgets;
 
 namespace VideoTinyTool.Ui.Panels;
@@ -84,7 +85,7 @@ public sealed class TimelinePanel : PanelBase
         renderer.HorizontalLine(Bounds.Left, Bounds.Top, Bounds.Width, Theme.Line);
 
         var clipCount = _host.Timeline.Clips.Count;
-        DrawHeader(renderer, "Timeline", clipCount == 1 ? "1 clip" : $"{clipCount} clips");
+        DrawHeader(renderer, I18n.Timeline.Title, I18n.Timeline.ClipCount(clipCount));
 
         ClampScroll();
         DrawRuler(renderer);
@@ -197,7 +198,7 @@ public sealed class TimelinePanel : PanelBase
             new FloatRect(bounds.Position, new Vector2f(bounds.Width, 17)),
             Theme.WithAlpha(Theme.FrameVoid, 190));
 
-        var name = source?.FileName ?? "missing source";
+        var name = source?.FileName ?? I18n.Timeline.MissingSource;
         renderer.DrawText(
             renderer.Ellipsize(name, bounds.Width - 10, Theme.FontSizeLabel),
             bounds.Left + 5,
@@ -313,15 +314,17 @@ public sealed class TimelinePanel : PanelBase
         renderer.HorizontalLine(footer.Left, footer.Top, footer.Width, Theme.Line);
 
         var selected = _host.SelectedClip;
-        var inText = selected is null ? "IN  --:--.---" : "IN  " + TimeFormat.Timecode(selected.In);
-        var outText = selected is null ? "OUT --:--.---" : "OUT " + TimeFormat.Timecode(selected.Out);
+        var inText = I18n.Timeline.InPrefix
+                     + (selected is null ? I18n.Timeline.NoTimecode : TimeFormat.Timecode(selected.In));
+        var outText = I18n.Timeline.OutPrefix
+                      + (selected is null ? I18n.Timeline.NoTimecode : TimeFormat.Timecode(selected.Out));
 
         var y = footer.Top + 5;
         renderer.DrawText(inText, footer.Left + Theme.Padding, y, Theme.FontSizeLabel, Theme.TextFaint, TextFont.Mono);
         renderer.DrawText(outText, footer.Left + Theme.Padding + 130, y, Theme.FontSizeLabel, Theme.TextFaint, TextFont.Mono);
 
         renderer.DrawText(
-            "Zoom",
+            I18n.Timeline.Zoom,
             _zoom.Bounds.Left - 8,
             y,
             Theme.FontSizeLabel,

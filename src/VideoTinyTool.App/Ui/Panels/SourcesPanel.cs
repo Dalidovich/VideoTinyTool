@@ -1,8 +1,8 @@
-using System.Globalization;
 using SFML.Graphics;
 using SFML.System;
 using SFML.Window;
 using VideoTinyTool.Domain;
+using VideoTinyTool.Localization;
 using VideoTinyTool.Ui.Widgets;
 
 namespace VideoTinyTool.Ui.Panels;
@@ -28,7 +28,7 @@ public sealed class SourcesPanel : PanelBase
         renderer.VerticalLine(Bounds.Left + Bounds.Width - 1, Bounds.Top, Bounds.Height, Theme.Line);
 
         var count = _host.Sources.Count;
-        DrawHeader(renderer, "Sources", count == 1 ? "1 file" : $"{count} files");
+        DrawHeader(renderer, I18n.Sources.Title, I18n.Sources.FileCount(count));
 
         _list.Bounds = BodyBounds;
         _list.ItemCount = count;
@@ -39,7 +39,7 @@ public sealed class SourcesPanel : PanelBase
         if (count == 0)
         {
             renderer.DrawText(
-                "No sources yet — use Import…",
+                I18n.Sources.Empty,
                 _list.Bounds.Left + Theme.Padding,
                 _list.Bounds.Top + Theme.Padding,
                 Theme.FontSizeSmall,
@@ -115,9 +115,7 @@ public sealed class SourcesPanel : PanelBase
             Theme.FontSizeBody,
             missing ? Theme.ClipMissingBorder : Theme.Text);
 
-        var meta = string.Format(
-            CultureInfo.InvariantCulture,
-            "{0} · {1}×{2} · {3}",
+        var meta = I18n.Sources.Meta(
             TimeFormat.Timecode(source.Duration),
             source.Width,
             source.Height,
@@ -125,11 +123,11 @@ public sealed class SourcesPanel : PanelBase
 
         if (missing)
         {
-            meta = "file is missing";
+            meta = I18n.Sources.FileMissing;
         }
         else if (!source.HasAudio)
         {
-            meta += " · no audio";
+            meta += I18n.Sources.NoAudio;
         }
 
         renderer.DrawText(

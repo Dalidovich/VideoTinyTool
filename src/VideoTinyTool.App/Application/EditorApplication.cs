@@ -5,6 +5,7 @@ using SFML.System;
 using SFML.Window;
 using VideoTinyTool.Commands;
 using VideoTinyTool.Domain;
+using VideoTinyTool.Localization;
 using VideoTinyTool.Media;
 using VideoTinyTool.Platform;
 using VideoTinyTool.Ui;
@@ -65,7 +66,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
         _window = new RenderWindow(
             new VideoMode(new Vector2u((uint)settings.Window.Width, (uint)settings.Window.Height)),
-            "VideoTinyTool",
+            I18n.Brand.Full,
             Styles.Default,
             State.Windowed);
 
@@ -480,12 +481,10 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         }
 
         var dialog = new ModalDialog(
-            "Remove source",
-            usage == 1
-                ? $"{source.FileName} is used by one clip on the timeline. Removing the source removes that clip too."
-                : $"{source.FileName} is used by {usage} clips on the timeline. Removing the source removes those clips too.");
+            I18n.Dialogs.RemoveSourceTitle,
+            I18n.Dialogs.RemoveSourceMessage(source.FileName, usage));
 
-        dialog.AddButton("Remove", ButtonStyle.Accent, () =>
+        dialog.AddButton(I18n.Dialogs.RemoveSourceConfirm, ButtonStyle.Accent, () =>
         {
             dialog.Close();
             if (_sources.Contains(source))
@@ -494,7 +493,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             }
         });
 
-        dialog.AddButton("Cancel", ButtonStyle.Normal, dialog.Close);
+        dialog.AddButton(I18n.Dialogs.Cancel, ButtonStyle.Normal, dialog.Close);
         ShowDialog(dialog);
     }
 
@@ -569,7 +568,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
         if (!FFmpegRuntime.Available)
         {
-            ShowMessage("ffmpeg is missing", FFmpegRuntime.MissingBinariesMessage);
+            ShowMessage(I18n.Dialogs.FFmpegMissingTitle, FFmpegRuntime.MissingBinariesMessage);
             return;
         }
 
@@ -595,14 +594,14 @@ public sealed class EditorApplication : IEditorHost, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    failures.Add($"{Path.GetFileName(path)} — {ex.Message}");
+                    failures.Add(I18n.Dialogs.ImportFailure(Path.GetFileName(path), ex.Message));
                 }
             }
 
             if (failures.Count > 0)
             {
                 ShowMessage(
-                    failures.Count == 1 ? "A file could not be imported" : "Some files could not be imported",
+                    I18n.Dialogs.ImportFailedTitle(failures.Count),
                     string.Join("\n", failures));
             }
         }
@@ -621,7 +620,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
         if (!FFmpegRuntime.Available)
         {
-            ShowMessage("ffmpeg is missing", FFmpegRuntime.MissingBinariesMessage);
+            ShowMessage(I18n.Dialogs.FFmpegMissingTitle, FFmpegRuntime.MissingBinariesMessage);
             return;
         }
 
@@ -629,16 +628,16 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         if (_missingSources.Count > 0)
         {
             ShowMessage(
-                "Sources are missing",
-                "These files are no longer on disk and the timeline cannot be exported:\n"
-                + string.Join("\n", _missingSources.Select(id => FindSource(id)?.Path ?? id.ToString())));
+                I18n.Dialogs.MissingSourcesTitle,
+                I18n.Dialogs.MissingSourcesMessage(
+                    _missingSources.Select(id => FindSource(id)?.Path ?? id.ToString())));
             return;
         }
 
         _player.Pause();
 
         var container = _settings.Export.Container;
-        var path = NativeFileDialog.SaveFile(_window.NativeHandle, container, $"timeline.{container}");
+        var path = NativeFileDialog.SaveFile(_window.NativeHandle, container, I18n.FileDialogs.DefaultExportName(container));
         if (path is null)
         {
             return;
@@ -650,8 +649,8 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             return;
         }
 
-        _progressDialog = new ProgressDialog("Exporting", path);
-        _progressDialog.AddButton("Cancel", ButtonStyle.Normal, () => _export.Cancel());
+        _progressDialog = new ProgressDialog(I18n.Dialogs.ExportingTitle, path);
+        _progressDialog.AddButton(I18n.Dialogs.Cancel, ButtonStyle.Normal, () => _export.Cancel());
         ShowDialog(_progressDialog);
 
         _export.Start(items, _settings.Export, path, _timeline.TotalDuration);
@@ -810,15 +809,15 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         switch (result.Outcome)
         {
             case ExportOutcome.Completed:
-                ShowMessage("Export finished", result.OutputPath);
+                ShowMessage(I18n.Dialogs.ExportFinishedTitle, result.OutputPath);
                 break;
 
             case ExportOutcome.Cancelled:
-                ShowMessage("Export cancelled", "The partial output file was removed.");
+                ShowMessage(I18n.Dialogs.ExportCancelledTitle, I18n.Dialogs.ExportCancelledMessage);
                 break;
 
             case ExportOutcome.Failed:
-                ShowMessage("Export failed", result.ErrorMessage ?? "ffmpeg reported an unknown error.");
+                ShowMessage(I18n.Dialogs.ExportFailedTitle, result.ErrorMessage ?? I18n.Dialogs.ExportFailedFallback);
                 break;
         }
 
@@ -844,7 +843,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
     private void ShowMessage(string title, string message)
     {
         var dialog = new ModalDialog(title, message);
-        dialog.AddButton("OK", ButtonStyle.Accent, dialog.Close);
+        dialog.AddButton(I18n.Dialogs.Ok, ButtonStyle.Accent, dialog.Close);
         ShowDialog(dialog);
     }
 
@@ -873,17 +872,17 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         }
 
         var dialog = new ModalDialog(
-            "Export is running",
-            "Closing now stops ffmpeg and deletes the unfinished output file. Close anyway?");
+            I18n.Dialogs.ExportRunningTitle,
+            I18n.Dialogs.ExportRunningMessage);
 
-        dialog.AddButton("Stop and close", ButtonStyle.Accent, () =>
+        dialog.AddButton(I18n.Dialogs.StopAndClose, ButtonStyle.Accent, () =>
         {
             _closeRequested = true;
             _export.Cancel();
             dialog.Close();
         });
 
-        dialog.AddButton("Keep exporting", ButtonStyle.Normal, dialog.Close);
+        dialog.AddButton(I18n.Dialogs.KeepExporting, ButtonStyle.Normal, dialog.Close);
 
         _dialog = dialog;
         _progressDialog = null;
@@ -891,19 +890,28 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     private void ReportStartupProblems()
     {
-        if (_settings.LoadWarning is { Length: > 0 } settingsWarning)
+        if (_settings.LoadIssue is { } settingsIssue)
         {
-            ShowMessage("settings.json", settingsWarning);
+            ShowMessage(I18n.Dialogs.SettingsTitle, settingsIssue.Kind switch
+            {
+                SettingsLoadFailure.Unreadable => I18n.Startup.SettingsUnreadable(settingsIssue.Detail),
+                _ => I18n.Startup.SettingsNotCreated(settingsIssue.Detail)
+            });
+        }
+
+        if (I18n.Warning is { Length: > 0 } localizationWarning)
+        {
+            ShowMessage(I18n.Dialogs.LocalizationTitle, localizationWarning);
         }
 
         if (_fonts.Warning is { Length: > 0 } fontWarning)
         {
-            ShowMessage("Fonts", fontWarning);
+            ShowMessage(I18n.Dialogs.FontsTitle, fontWarning);
         }
 
         if (!FFmpegRuntime.Available)
         {
-            ShowMessage("ffmpeg is missing", FFmpegRuntime.MissingBinariesMessage);
+            ShowMessage(I18n.Dialogs.FFmpegMissingTitle, FFmpegRuntime.MissingBinariesMessage);
         }
     }
 
