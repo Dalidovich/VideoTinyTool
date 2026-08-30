@@ -6,10 +6,10 @@ namespace VideoTinyTool.Ui.Widgets;
 public class ModalDialog
 {
     private const float DefaultWidth = 520f;
-    private const float VerticalPadding = 18f;
     private const float ButtonHeight = 26f;
 
     protected const float HorizontalPadding = 22f;
+    protected const float VerticalPadding = 18f;
 
     private readonly List<Button> _buttons = new();
 
@@ -29,6 +29,8 @@ public class ModalDialog
 
     public FloatRect Bounds { get; private set; }
 
+    protected float ContentTop => Bounds.Top + VerticalPadding + 32f;
+
     public Button AddButton(string label, ButtonStyle style, Action onClick)
     {
         var button = new Button(label, style);
@@ -44,7 +46,7 @@ public class ModalDialog
 
     protected virtual float MeasureWidth(Renderer renderer) => DefaultWidth;
 
-    public void Layout(Renderer renderer, uint windowWidth, uint windowHeight)
+    public virtual void Layout(Renderer renderer, uint windowWidth, uint windowHeight)
     {
         var width = MeasureWidth(renderer);
         var contentWidth = width - (HorizontalPadding * 2);
@@ -73,7 +75,7 @@ public class ModalDialog
         }
     }
 
-    public void UpdateHover(Vector2f point)
+    public virtual void UpdateHover(Vector2f point)
     {
         foreach (var button in _buttons)
         {
@@ -110,8 +112,7 @@ public class ModalDialog
 
         renderer.DrawText(Title, contentLeft, Bounds.Top + VerticalPadding, 15, Theme.Text, TextFont.SemiBold);
 
-        var y = Bounds.Top + VerticalPadding + 32f;
-        DrawContent(renderer, contentLeft, y, contentWidth);
+        DrawContent(renderer, contentLeft, ContentTop, contentWidth);
 
         foreach (var button in _buttons)
         {
@@ -128,11 +129,14 @@ public class ModalDialog
         }
     }
 
-    protected List<string> WrapLines(Renderer renderer, float width)
+    protected List<string> WrapLines(Renderer renderer, float width) =>
+        WrapText(renderer, Message, width, Theme.FontSizeBody);
+
+    protected static List<string> WrapText(Renderer renderer, string text, float width, uint size)
     {
         var lines = new List<string>();
 
-        foreach (var paragraph in Message.Replace("\r\n", "\n").Split('\n'))
+        foreach (var paragraph in text.Replace("\r\n", "\n").Split('\n'))
         {
             if (paragraph.Length == 0)
             {
@@ -144,7 +148,7 @@ public class ModalDialog
             foreach (var word in paragraph.Split(' '))
             {
                 var candidate = current.Length == 0 ? word : current + " " + word;
-                if (renderer.MeasureText(candidate, Theme.FontSizeBody) <= width)
+                if (renderer.MeasureText(candidate, size) <= width)
                 {
                     current = candidate;
                     continue;
@@ -155,9 +159,9 @@ public class ModalDialog
                     lines.Add(current);
                 }
 
-                current = renderer.MeasureText(word, Theme.FontSizeBody) <= width
+                current = renderer.MeasureText(word, size) <= width
                     ? word
-                    : renderer.Ellipsize(word, width, Theme.FontSizeBody);
+                    : renderer.Ellipsize(word, width, size);
             }
 
             lines.Add(current);

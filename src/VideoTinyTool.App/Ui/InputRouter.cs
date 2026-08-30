@@ -18,12 +18,8 @@ public sealed class InputRouter
 
     public void Register(PanelBase panel) => _panels.Add(panel);
 
-    public Vector2f MousePosition { get; private set; }
-
     public void MouseDown(Vector2f point, Mouse.Button button)
     {
-        MousePosition = point;
-
         var panel = PanelAt(point);
         if (panel is null)
         {
@@ -45,8 +41,6 @@ public sealed class InputRouter
 
     public void MouseUp(Vector2f point, Mouse.Button button)
     {
-        MousePosition = point;
-
         var target = _captured ?? PanelAt(point);
         _captured = null;
         target?.OnMouseUp(point, button);
@@ -54,8 +48,6 @@ public sealed class InputRouter
 
     public void MouseMove(Vector2f point)
     {
-        MousePosition = point;
-
         if (_captured is not null)
         {
             _captured.OnMouseMove(point);
@@ -72,11 +64,8 @@ public sealed class InputRouter
         panel?.OnMouseMove(point);
     }
 
-    public void Scroll(Vector2f point, float delta, bool control)
-    {
-        MousePosition = point;
+    public void Scroll(Vector2f point, float delta, bool control) =>
         PanelAt(point)?.OnScroll(point, delta, control);
-    }
 
     public void ReleaseCapture()
     {

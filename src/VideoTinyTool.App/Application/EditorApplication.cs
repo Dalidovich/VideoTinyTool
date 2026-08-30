@@ -49,6 +49,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
     private ExportResult? _exportResult;
 
     private EditorLayout _layout;
+    private Vector2f _pointer;
     private MediaSource? _selectedSource;
     private Clip? _selectedClip;
     private int _shuttleIndex;
@@ -167,7 +168,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         if (_dialog is not null)
         {
             _dialog.Layout(_renderer, _window.Size.X, _window.Size.Y);
-            _dialog.UpdateHover(_input.MousePosition);
+            _dialog.UpdateHover(_pointer);
             _dialog.Draw(_renderer, _window.Size.X, _window.Size.Y);
         }
 
@@ -195,6 +196,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
     private void OnMouseDown(MouseButtonEventArgs e)
     {
         var point = new Vector2f(e.Position.X, e.Position.Y);
+        _pointer = point;
 
         if (_dialog is not null)
         {
@@ -208,6 +210,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
     private void OnMouseUp(MouseButtonEventArgs e)
     {
         var point = new Vector2f(e.Position.X, e.Position.Y);
+        _pointer = point;
 
         if (_dialog is not null)
         {
@@ -221,6 +224,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
     private void OnMouseMove(MouseMoveEventArgs e)
     {
         var point = new Vector2f(e.Position.X, e.Position.Y);
+        _pointer = point;
 
         if (_dialog is not null)
         {
@@ -642,6 +646,21 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
         _player.Pause();
 
+        var setup = new ExportSettingsDialog(_settings.Export);
+
+        setup.AddButton(I18n.ExportSetup.Start, ButtonStyle.Accent, () =>
+        {
+            setup.Close();
+            setup.Apply(_settings.Export);
+            BeginExport();
+        });
+
+        setup.AddButton(I18n.Dialogs.Cancel, ButtonStyle.Normal, setup.Close);
+        ShowDialog(setup);
+    }
+
+    private void BeginExport()
+    {
         var container = _settings.Export.Container;
         var path = NativeFileDialog.SaveFile(_window.NativeHandle, container, I18n.FileDialogs.DefaultExportName(container));
         if (path is null)

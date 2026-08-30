@@ -104,6 +104,36 @@ public static class I18n
         public static string ClipCount(int count) => _catalog.Plural("timeline.clipCount", count, count);
     }
 
+    public static class ExportSetup
+    {
+        public static string Title => _catalog.Text("exportSetup.title");
+        public static string Start => _catalog.Text("exportSetup.start");
+
+        public static string Container => _catalog.Text("exportSetup.container");
+        public static string ContainerHint => _catalog.Text("exportSetup.containerHint");
+
+        public static string VideoCodec => _catalog.Text("exportSetup.videoCodec");
+        public static string VideoCodecHint => _catalog.Text("exportSetup.videoCodecHint");
+
+        public static string Quality => _catalog.Text("exportSetup.quality");
+        public static string QualityHint => _catalog.Text("exportSetup.qualityHint");
+
+        public static string Preset => _catalog.Text("exportSetup.preset");
+        public static string PresetHint => _catalog.Text("exportSetup.presetHint");
+
+        public static string Resolution => _catalog.Text("exportSetup.resolution");
+        public static string ResolutionHint => _catalog.Text("exportSetup.resolutionHint");
+
+        public static string FrameRate => _catalog.Text("exportSetup.frameRate");
+        public static string FrameRateHint => _catalog.Text("exportSetup.frameRateHint");
+
+        public static string AudioCodec => _catalog.Text("exportSetup.audioCodec");
+        public static string AudioCodecHint => _catalog.Text("exportSetup.audioCodecHint");
+
+        public static string AudioBitrate => _catalog.Text("exportSetup.audioBitrate");
+        public static string AudioBitrateHint => _catalog.Text("exportSetup.audioBitrateHint");
+    }
+
     public static class Dialogs
     {
         public static string Ok => _catalog.Text("dialogs.ok");

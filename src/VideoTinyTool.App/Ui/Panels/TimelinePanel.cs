@@ -10,14 +10,14 @@ namespace VideoTinyTool.Ui.Panels;
 
 public sealed class TimelinePanel : PanelBase
 {
-    private const float MinPixelsPerSecond = 2f;
-    private const float MaxPixelsPerSecond = 600f;
+    private const float MinPixelsPerSecond = 0.25f;
+    private const float MaxPixelsPerSecond = 4000f;
     private const float EdgeGrabWidth = 7f;
     private const float ClipPadding = 8f;
 
     private static readonly double[] TickSteps =
     [
-        0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600
+        0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400
     ];
 
     private enum DragMode

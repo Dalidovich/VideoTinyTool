@@ -70,6 +70,26 @@
       "other": "{0} clips"
     }
   },
+  "exportSetup": {
+    "title": "Export settings",
+    "start": "Export…",
+    "container": "Container",
+    "containerHint": "File format of the result. mp4 plays anywhere, mkv holds almost any combination of streams, mov is the usual choice for further editing.",
+    "videoCodec": "Video codec",
+    "videoCodecHint": "libx264 encodes quickly and plays on any device. libx265 makes the file about a third smaller at the same quality, but encodes several times slower and is not supported everywhere.",
+    "quality": "Quality (CRF)",
+    "qualityHint": "Constant quality factor: the lower the number, the better the picture and the larger the file. 18 is visually lossless, 23 is the ffmpeg default, above 28 the artefacts become visible.",
+    "preset": "Preset",
+    "presetHint": "Trade between encoding time and file size. Slower presets take longer and pack the same quality into fewer bytes; the picture quality itself is set by CRF.",
+    "resolution": "Resolution",
+    "resolutionHint": "Frame size of the result. Every clip is scaled to fit it, the aspect ratio is kept and the remaining space is filled with black bars.",
+    "frameRate": "Frame rate",
+    "frameRateHint": "Frames per second in the result. All clips are converted to this rate; a rate above the source one adds no smoothness, it only enlarges the file.",
+    "audioCodec": "Audio codec",
+    "audioCodecHint": "Encoder for the sound track. aac is the standard companion of mp4 and plays everywhere, libmp3lame is the classic mp3, ac3 is used by DVD and broadcast.",
+    "audioBitrate": "Audio bitrate, kbps",
+    "audioBitrateHint": "Sound quality: 128 is enough for speech, 192 is the usual choice for music, above 256 the difference is barely audible."
+  },
   "dialogs": {
     "ok": "OK",
     "cancel": "Cancel",

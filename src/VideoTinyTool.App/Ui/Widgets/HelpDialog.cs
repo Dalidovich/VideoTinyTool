@@ -1,3 +1,4 @@
+using SFML.System;
 using VideoTinyTool.Localization;
 
 namespace VideoTinyTool.Ui.Widgets;
@@ -12,6 +13,8 @@ public sealed class HelpDialog : ModalDialog
     private const uint KeySize = Theme.FontSizeSmall;
     private const uint TextSize = Theme.FontSizeSmall;
 
+    private bool _pressedOutside;
+
     public HelpDialog() : base(I18n.Help.Title, string.Empty)
     {
         AddButton(I18n.Dialogs.Ok, ButtonStyle.Accent, Close);
@@ -19,6 +22,24 @@ public sealed class HelpDialog : ModalDialog
 
     private static IEnumerable<ShortcutGroup> AllGroups =>
         ShortcutReference.LeftColumn.Concat(ShortcutReference.RightColumn);
+
+    public override void OnMouseDown(Vector2f point)
+    {
+        _pressedOutside = !Bounds.Contains(point);
+        base.OnMouseDown(point);
+    }
+
+    public override void OnMouseUp(Vector2f point)
+    {
+        base.OnMouseUp(point);
+
+        if (_pressedOutside && !Bounds.Contains(point))
+        {
+            Close();
+        }
+
+        _pressedOutside = false;
+    }
 
     public override float ContentHeight(Renderer renderer, float contentWidth) =>
         Math.Max(ColumnHeight(ShortcutReference.LeftColumn), ColumnHeight(ShortcutReference.RightColumn));
