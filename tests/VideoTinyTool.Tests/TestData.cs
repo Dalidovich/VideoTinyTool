@@ -20,6 +20,17 @@ internal static class TestData
             "h264",
             hasAudio ? "aac" : null);
 
+    public static MediaSource AudioSource(double durationSeconds = 60, string codec = "mp3") =>
+        new(
+            Guid.NewGuid(),
+            @"C:\media\track.mp3",
+            TimeSpan.FromSeconds(durationSeconds),
+            0,
+            0,
+            25,
+            null,
+            codec);
+
     public static Clip Clip(Guid sourceId, double inSeconds, double outSeconds) =>
         VideoTinyTool.Domain.Clip.Create(sourceId, TimeSpan.FromSeconds(inSeconds), TimeSpan.FromSeconds(outSeconds));
 

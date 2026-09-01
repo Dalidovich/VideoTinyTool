@@ -59,7 +59,9 @@
     "empty": "Источников пока нет — нажмите «Импорт…»",
     "fileMissing": "файл не найден",
     "noAudio": " · без звука",
+    "audioOnly": "АУДИО",
     "meta": "{0} · {1}×{2} · {3}",
+    "audioMeta": "{0} · {1}",
     "fileCount": {
       "one": "{0} файл",
       "few": "{0} файла",
@@ -139,9 +141,11 @@
     "percent": "{0} %"
   },
   "fileDialogs": {
-    "importTitle": "Импорт видеофайлов",
+    "importTitle": "Импорт видео- и аудиофайлов",
     "exportTitle": "Экспорт таймлайна",
+    "mediaFiles": "Медиафайлы",
     "videoFiles": "Видеофайлы",
+    "audioFiles": "Аудиофайлы",
     "allFiles": "Все файлы",
     "containerVideo": "Видео {0}",
     "defaultExportName": "timeline.{0}"
@@ -159,7 +163,7 @@
     "fileNotFound": "Файл не найден.",
     "ffprobeNotStarted": "Не удалось запустить ffprobe.",
     "noStreams": "ffprobe не сообщил ни об одном потоке.",
-    "noVideoStream": "В файле нет видеопотока.",
+    "noPlayableStream": "В файле нет ни видео-, ни аудиопотока.",
     "noFrameSize": "У видеопотока нет пригодного размера кадра.",
     "noDuration": "У файла нет читаемой длительности.",
     "ffprobeNotFound": "ffprobe.exe не найден: {0}.",

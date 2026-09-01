@@ -9,7 +9,7 @@ public sealed class MediaSource
         int width,
         int height,
         double frameRate,
-        string videoCodec,
+        string? videoCodec,
         string? audioCodec)
     {
         Id = id;
@@ -30,12 +30,14 @@ public sealed class MediaSource
     public int Width { get; }
     public int Height { get; }
     public double FrameRate { get; }
-    public string VideoCodec { get; }
+    public string? VideoCodec { get; }
     public string? AudioCodec { get; }
+
+    public bool HasVideo => VideoCodec is not null;
 
     public bool HasAudio => AudioCodec is not null;
 
     public TimeSpan FrameDuration => TimeSpan.FromSeconds(1.0 / FrameRate);
 
-    public double AspectRatio => Height > 0 ? (double)Width / Height : 16.0 / 9.0;
+    public double AspectRatio => Width > 0 && Height > 0 ? (double)Width / Height : 16.0 / 9.0;
 }

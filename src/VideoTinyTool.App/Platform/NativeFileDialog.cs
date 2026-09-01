@@ -9,6 +9,9 @@ public static class NativeFileDialog
 {
     private const int MaxMultiSelectBuffer = 64 * 1024;
 
+    private const string VideoPatterns = "*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v;*.mpg;*.mpeg;*.wmv;*.ts;*.mts;*.m2ts;*.flv";
+    private const string AudioPatterns = "*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma";
+
     private const int OfnReadOnly = 0x00000001;
     private const int OfnHideReadOnly = 0x00000004;
     private const int OfnNoChangeDir = 0x00000008;
@@ -54,7 +57,7 @@ public static class NativeFileDialog
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetSaveFileNameW(ref OpenFileName ofn);
 
-    public static IReadOnlyList<string> OpenVideoFiles(IntPtr owner)
+    public static IReadOnlyList<string> OpenMediaFiles(IntPtr owner)
     {
         var buffer = Marshal.AllocHGlobal(MaxMultiSelectBuffer * sizeof(char));
         try
@@ -69,7 +72,9 @@ public static class NativeFileDialog
                 lStructSize = Marshal.SizeOf<OpenFileName>(),
                 hwndOwner = owner,
                 lpstrFilter = BuildFilter(
-                    (I18n.FileDialogs.VideoFiles, "*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v;*.mpg;*.mpeg;*.wmv;*.ts;*.mts;*.m2ts;*.flv"),
+                    (I18n.FileDialogs.MediaFiles, $"{VideoPatterns};{AudioPatterns}"),
+                    (I18n.FileDialogs.VideoFiles, VideoPatterns),
+                    (I18n.FileDialogs.AudioFiles, AudioPatterns),
                     (I18n.FileDialogs.AllFiles, "*.*")),
                 nFilterIndex = 1,
                 lpstrFile = buffer,

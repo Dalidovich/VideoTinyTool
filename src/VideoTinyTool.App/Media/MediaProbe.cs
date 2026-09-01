@@ -101,20 +101,28 @@ public static class MediaProbe
                 }
             }
 
-            if (video is null)
+            var width = video is null ? 0 : ReadInt(video.Value, "width") ?? 0;
+            var height = video is null ? 0 : ReadInt(video.Value, "height") ?? 0;
+
+            if (video is not null && (width <= 0 || height <= 0))
             {
-                throw new ProbeFailedException(I18n.Probe.NoVideoStream);
+                if (audio is null)
+                {
+                    throw new ProbeFailedException(I18n.Probe.NoFrameSize);
+                }
+
+                video = null;
+                width = 0;
+                height = 0;
             }
 
-            var videoStream = video.Value;
-            var width = ReadInt(videoStream, "width") ?? 0;
-            var height = ReadInt(videoStream, "height") ?? 0;
-            if (width <= 0 || height <= 0)
+            if (video is null && audio is null)
             {
-                throw new ProbeFailedException(I18n.Probe.NoFrameSize);
+                throw new ProbeFailedException(I18n.Probe.NoPlayableStream);
             }
 
-            var duration = ReadDuration(videoStream, root);
+            var timed = video ?? audio!.Value;
+            var duration = ReadDuration(timed, root);
             if (duration <= TimeSpan.Zero)
             {
                 throw new ProbeFailedException(I18n.Probe.NoDuration);
@@ -126,8 +134,8 @@ public static class MediaProbe
                 duration,
                 width,
                 height,
-                ParseFrameRate(ReadString(videoStream, "r_frame_rate")),
-                ReadString(videoStream, "codec_name") ?? "unknown",
+                video is null ? 25.0 : ParseFrameRate(ReadString(video.Value, "r_frame_rate")),
+                video is null ? null : ReadString(video.Value, "codec_name") ?? "unknown",
                 audio is null ? null : ReadString(audio.Value, "codec_name") ?? "unknown");
         }
     }
@@ -166,9 +174,9 @@ public static class MediaProbe
                && attached.GetInt32() == 1;
     }
 
-    private static TimeSpan ReadDuration(JsonElement videoStream, JsonElement root)
+    private static TimeSpan ReadDuration(JsonElement stream, JsonElement root)
     {
-        var streamDuration = ReadSeconds(videoStream, "duration");
+        var streamDuration = ReadSeconds(stream, "duration");
         if (streamDuration is { } fromStream && fromStream > TimeSpan.Zero)
         {
             return fromStream;

@@ -258,6 +258,50 @@ public class TrackCommandTests
     }
 
     [Fact]
+    public void AddClipCommand_CreatesTheFirstAudioTrackAndUndoesItInOneStep()
+    {
+        var timeline = new Timeline();
+        var history = new CommandHistory(timeline);
+        var clip = TestData.Clip(Guid.NewGuid(), 0, 4);
+
+        history.Execute(new AddClipCommand(clip, TrackKind.Audio));
+
+        Assert.Equal(1, timeline.AudioTrackCount);
+        Assert.Equal(new[] { clip }, timeline.ClipsOf(timeline.FirstAudioTrackIndex));
+        Assert.Empty(timeline.Clips);
+
+        history.Undo();
+
+        Assert.Equal(0, timeline.AudioTrackCount);
+        Assert.Single(timeline.Tracks);
+
+        history.Redo();
+
+        Assert.Equal(1, timeline.AudioTrackCount);
+        Assert.Equal(new[] { clip }, timeline.ClipsOf(timeline.FirstAudioTrackIndex));
+    }
+
+    [Fact]
+    public void AddClipCommand_AppendsToTheLastExistingAudioTrack()
+    {
+        var timeline = new Timeline();
+        var history = new CommandHistory(timeline);
+        timeline.AddTrack(TrackKind.Audio);
+        timeline.AddTrack(TrackKind.Audio);
+        var clip = TestData.Clip(Guid.NewGuid(), 0, 4);
+
+        history.Execute(new AddClipCommand(clip, TrackKind.Audio));
+
+        var last = timeline.Tracks.Count - 1;
+        Assert.Equal(new[] { clip }, timeline.ClipsOf(last));
+
+        history.Undo();
+
+        Assert.Equal(2, timeline.AudioTrackCount);
+        Assert.Empty(timeline.ClipsOf(last));
+    }
+
+    [Fact]
     public void RemoveSourceCommand_ClearsEveryTrack()
     {
         var timeline = new Timeline();

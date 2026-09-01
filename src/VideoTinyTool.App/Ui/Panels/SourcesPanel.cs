@@ -77,8 +77,17 @@ public sealed class SourcesPanel : PanelBase
             new Vector2f(row.Left + Theme.Padding, row.Top + 7),
             new Vector2f(Theme.SourceThumbWidth, Theme.SourceThumbHeight));
 
-        var texture = _host.Thumbnails.GetPoster(source);
-        if (texture is not null)
+        if (!source.HasVideo)
+        {
+            renderer.FillRect(thumbBounds, Theme.Sunk);
+            renderer.DrawTextCentered(
+                I18n.Sources.AudioOnly,
+                thumbBounds,
+                Theme.FontSizeLabel,
+                Theme.TextDim,
+                TextFont.SemiBold);
+        }
+        else if (_host.Thumbnails.GetPoster(source) is { } texture)
         {
             renderer.DrawTextureCover(texture, thumbBounds);
         }
@@ -115,17 +124,19 @@ public sealed class SourcesPanel : PanelBase
             Theme.FontSizeBody,
             missing ? Theme.ClipMissingBorder : Theme.Text);
 
-        var meta = I18n.Sources.Meta(
-            TimeFormat.Timecode(source.Duration),
-            source.Width,
-            source.Height,
-            TimeFormat.FrameRate(source.FrameRate));
+        var meta = source.HasVideo
+            ? I18n.Sources.Meta(
+                TimeFormat.Timecode(source.Duration),
+                source.Width,
+                source.Height,
+                TimeFormat.FrameRate(source.FrameRate))
+            : I18n.Sources.AudioMeta(TimeFormat.Timecode(source.Duration), source.AudioCodec ?? string.Empty);
 
         if (missing)
         {
             meta = I18n.Sources.FileMissing;
         }
-        else if (!source.HasAudio)
+        else if (source.HasVideo && !source.HasAudio)
         {
             meta += I18n.Sources.NoAudio;
         }

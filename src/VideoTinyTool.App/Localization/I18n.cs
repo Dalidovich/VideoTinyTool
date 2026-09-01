@@ -95,11 +95,15 @@ public static class I18n
         public static string Empty => _catalog.Text("sources.empty");
         public static string FileMissing => _catalog.Text("sources.fileMissing");
         public static string NoAudio => _catalog.Text("sources.noAudio");
+        public static string AudioOnly => _catalog.Text("sources.audioOnly");
 
         public static string FileCount(int count) => _catalog.Plural("sources.fileCount", count, count);
 
         public static string Meta(string duration, int width, int height, string frameRate) =>
             _catalog.Format("sources.meta", duration, width, height, frameRate);
+
+        public static string AudioMeta(string duration, string codec) =>
+            _catalog.Format("sources.audioMeta", duration, codec);
     }
 
     public static class Timeline
@@ -199,7 +203,9 @@ public static class I18n
     {
         public static string ImportTitle => _catalog.Text("fileDialogs.importTitle");
         public static string ExportTitle => _catalog.Text("fileDialogs.exportTitle");
+        public static string MediaFiles => _catalog.Text("fileDialogs.mediaFiles");
         public static string VideoFiles => _catalog.Text("fileDialogs.videoFiles");
+        public static string AudioFiles => _catalog.Text("fileDialogs.audioFiles");
         public static string AllFiles => _catalog.Text("fileDialogs.allFiles");
 
         public static string ContainerVideo(string container) =>
@@ -231,7 +237,7 @@ public static class I18n
         public static string FileNotFound => _catalog.Text("probe.fileNotFound");
         public static string FFprobeNotStarted => _catalog.Text("probe.ffprobeNotStarted");
         public static string NoStreams => _catalog.Text("probe.noStreams");
-        public static string NoVideoStream => _catalog.Text("probe.noVideoStream");
+        public static string NoPlayableStream => _catalog.Text("probe.noPlayableStream");
         public static string NoFrameSize => _catalog.Text("probe.noFrameSize");
         public static string NoDuration => _catalog.Text("probe.noDuration");
 

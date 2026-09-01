@@ -59,7 +59,9 @@
     "empty": "No sources yet — use Import…",
     "fileMissing": "file is missing",
     "noAudio": " · no audio",
+    "audioOnly": "AUDIO",
     "meta": "{0} · {1}×{2} · {3}",
+    "audioMeta": "{0} · {1}",
     "fileCount": {
       "one": "1 file",
       "other": "{0} files"
@@ -135,9 +137,11 @@
     "percent": "{0} %"
   },
   "fileDialogs": {
-    "importTitle": "Import video files",
+    "importTitle": "Import video and audio files",
     "exportTitle": "Export timeline",
+    "mediaFiles": "Media files",
     "videoFiles": "Video files",
+    "audioFiles": "Audio files",
     "allFiles": "All files",
     "containerVideo": "{0} video",
     "defaultExportName": "timeline.{0}"
@@ -155,7 +159,7 @@
     "fileNotFound": "File not found.",
     "ffprobeNotStarted": "ffprobe could not be started.",
     "noStreams": "ffprobe reported no streams.",
-    "noVideoStream": "The file has no video stream.",
+    "noPlayableStream": "The file has no video or audio stream.",
     "noFrameSize": "The video stream has no usable frame size.",
     "noDuration": "The file has no readable duration.",
     "ffprobeNotFound": "ffprobe.exe was not found at {0}.",

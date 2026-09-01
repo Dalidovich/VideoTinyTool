@@ -476,7 +476,9 @@ public sealed class EditorApplication : IEditorHost, IDisposable
     public void AppendSourceToTimeline(MediaSource source)
     {
         var clip = Clip.Create(source.Id, TimeSpan.Zero, source.Duration);
-        Execute(new AddClipCommand(clip, _timeline.Clips.Count));
+        Execute(source.HasVideo
+            ? new AddClipCommand(clip, _timeline.Clips.Count)
+            : new AddClipCommand(clip, TrackKind.Audio));
         _selectedClip = clip;
     }
 
@@ -567,8 +569,15 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         Execute(new RemoveTrackCommand(index));
     }
 
-    public void MoveClipToTrack(Clip clip, int trackIndex, TimeSpan start) =>
+    public void MoveClipToTrack(Clip clip, int trackIndex, TimeSpan start)
+    {
+        if (FindSource(clip.SourceId) is { HasVideo: false } && !_timeline.IsAudioTrack(trackIndex))
+        {
+            return;
+        }
+
         Execute(new MoveClipToTrackCommand(clip, trackIndex, start));
+    }
 
     public void SetOverlayTransform(Clip clip, OverlayTransform transform) =>
         Execute(new SetOverlayTransformCommand(clip, transform));
@@ -624,7 +633,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         _importInProgress = true;
         try
         {
-            var paths = NativeFileDialog.OpenVideoFiles(_window.NativeHandle);
+            var paths = NativeFileDialog.OpenMediaFiles(_window.NativeHandle);
             var failures = new List<string>();
 
             foreach (var path in paths)

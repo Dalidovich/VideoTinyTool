@@ -6,7 +6,7 @@ public sealed class ClipPipeline : IDisposable
 {
     private const int RingMilliseconds = 1500;
 
-    private readonly VideoFramePipe _video;
+    private readonly VideoFramePipe? _video;
     private readonly AudioPcmPipe? _audio;
     private readonly double _frameRate;
 
@@ -32,7 +32,10 @@ public sealed class ClipPipeline : IDisposable
         Height = previewHeight;
         _frameRate = Math.Clamp(source.FrameRate, 1, 120);
 
-        _video = new VideoFramePipe(source.Path, sourceOffset, previewWidth, previewHeight, _frameRate);
+        if (source.HasVideo)
+        {
+            _video = new VideoFramePipe(source.Path, sourceOffset, previewWidth, previewHeight, _frameRate);
+        }
 
         if (withAudio && source.HasAudio)
         {
@@ -62,15 +65,17 @@ public sealed class ClipPipeline : IDisposable
 
     public bool HasAudio => _audio is not null;
 
-    public int BufferedFrames => _video.BufferedFrames;
+    public bool HasVideo => _video is not null;
+
+    public int BufferedFrames => _video?.BufferedFrames ?? 0;
 
     public int BufferedAudioBytes => Ring?.Available ?? 0;
 
     public bool Primed =>
-        BufferedFrames >= 2
+        (!HasVideo || BufferedFrames >= 2)
         && (!HasAudio || BufferedAudioBytes >= AudioPcmPipe.SampleRate * AudioPcmPipe.Channels * AudioPcmPipe.BytesPerSample / 10);
 
-    public bool Exhausted => _video.Ended;
+    public bool Exhausted => _video is not null ? _video.Ended : _audio is null || _audio.SourceEnded;
 
     public void Start()
     {
@@ -80,7 +85,7 @@ public sealed class ClipPipeline : IDisposable
         }
 
         _started = true;
-        _video.Start();
+        _video?.Start();
         _audio?.Start();
     }
 
@@ -88,12 +93,13 @@ public sealed class ClipPipeline : IDisposable
 
     public bool TryTakeFrame(out byte[] frame)
     {
-        if (_video.TryTakeFrame(out frame))
+        if (_video is not null && _video.TryTakeFrame(out frame))
         {
             _framesTaken++;
             return true;
         }
 
+        frame = [];
         return false;
     }
 
@@ -101,6 +107,6 @@ public sealed class ClipPipeline : IDisposable
     {
         Ring?.Close();
         _audio?.Dispose();
-        _video.Dispose();
+        _video?.Dispose();
     }
 }

@@ -41,10 +41,52 @@ public class MediaProbeTests
     }
     """;
 
-    private const string AudioOnly = """
+    private const string AudioOnlyFromFormat = """
     {
       "streams": [ { "codec_type": "audio", "codec_name": "mp3" } ],
       "format": { "duration": "60.0" }
+    }
+    """;
+
+    private const string AudioOnlyWithStreamDuration = """
+    {
+      "streams": [
+        {
+          "codec_type": "audio",
+          "codec_name": "flac",
+          "sample_rate": "44100",
+          "duration": "184.400000"
+        }
+      ],
+      "format": { "duration": "190.0" }
+    }
+    """;
+
+    private const string AudioWithCoverArt = """
+    {
+      "streams": [
+        {
+          "codec_type": "audio",
+          "codec_name": "mp3",
+          "duration": "210.5"
+        },
+        {
+          "codec_type": "video",
+          "codec_name": "mjpeg",
+          "width": 600,
+          "height": 600,
+          "r_frame_rate": "90000/1",
+          "disposition": { "attached_pic": 1 }
+        }
+      ],
+      "format": { "duration": "210.5" }
+    }
+    """;
+
+    private const string NoStreamsAtAll = """
+    {
+      "streams": [],
+      "format": { "duration": "3.0" }
     }
     """;
 
@@ -141,12 +183,50 @@ public class MediaProbeTests
     }
 
     [Fact]
-    public void RejectsAFileWithoutAVideoStream()
+    public void ReadsAnAudioOnlyFileWithTheFormatDuration()
+    {
+        var source = MediaProbe.ParseProbeJson(AudioOnlyFromFormat, @"C:\media\song.mp3");
+
+        Assert.False(source.HasVideo);
+        Assert.Null(source.VideoCodec);
+        Assert.True(source.HasAudio);
+        Assert.Equal("mp3", source.AudioCodec);
+        Assert.Equal(0, source.Width);
+        Assert.Equal(0, source.Height);
+        Assert.Equal(25, source.FrameRate, 3);
+        Assert.Equal(16.0 / 9.0, source.AspectRatio, 5);
+        Assert.Equal(TimeSpan.FromSeconds(60), source.Duration);
+    }
+
+    [Fact]
+    public void PrefersTheAudioStreamDurationOverTheFormatDuration()
+    {
+        var source = MediaProbe.ParseProbeJson(AudioOnlyWithStreamDuration, @"C:\media\take.flac");
+
+        Assert.False(source.HasVideo);
+        Assert.Equal("flac", source.AudioCodec);
+        Assert.Equal(184.4, source.Duration.TotalSeconds, 3);
+    }
+
+    [Fact]
+    public void ReadsAnMp3WithACoverPictureAsAudioOnly()
+    {
+        var source = MediaProbe.ParseProbeJson(AudioWithCoverArt, @"C:\media\album.mp3");
+
+        Assert.False(source.HasVideo);
+        Assert.Null(source.VideoCodec);
+        Assert.Equal(0, source.Width);
+        Assert.Equal(0, source.Height);
+        Assert.Equal(210.5, source.Duration.TotalSeconds, 3);
+    }
+
+    [Fact]
+    public void RejectsAFileWithNoPlayableStream()
     {
         var error = Assert.Throws<ProbeFailedException>(() =>
-            MediaProbe.ParseProbeJson(AudioOnly, @"C:\media\song.mp3"));
+            MediaProbe.ParseProbeJson(NoStreamsAtAll, @"C:\media\empty.mp4"));
 
-        Assert.Contains("no video stream", error.Message);
+        Assert.Contains("no video or audio stream", error.Message);
     }
 
     [Fact]

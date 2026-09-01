@@ -330,7 +330,7 @@ public sealed class TimelinePanel : PanelBase
                     ? Theme.ClipOverlayFace
                     : Theme.ClipFace);
 
-        if (!missing && source is not null && bounds.Width > 8)
+        if (!missing && source is { HasVideo: true } && bounds.Width > 8)
         {
             DrawFilmstrip(renderer, clip, source, bounds);
         }
