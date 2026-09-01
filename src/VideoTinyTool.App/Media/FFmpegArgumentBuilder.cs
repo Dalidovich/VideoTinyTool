@@ -5,13 +5,15 @@ using VideoTinyTool.Domain;
 
 namespace VideoTinyTool.Media;
 
-public readonly record struct ExportItem(string SourcePath, TimeSpan In, TimeSpan Out, bool HasAudio)
+public readonly record struct ExportItem(string SourcePath, TimeSpan In, TimeSpan Out, bool HasAudio, float Gain = 1f)
 {
     public static ExportItem Gap(TimeSpan duration) => new(string.Empty, TimeSpan.Zero, duration, false);
 
     public bool IsGap => SourcePath.Length == 0;
 
     public TimeSpan Duration => Out - In;
+
+    public bool HasSound => !IsGap && HasAudio && Gain > 0f;
 }
 
 public readonly record struct OverlayItem(
@@ -26,6 +28,13 @@ public readonly record struct OverlayItem(
     public TimeSpan Duration => Out - In;
 
     public bool HasSound => HasAudio && Audio.Gain > 0f;
+}
+
+public readonly record struct AudioItem(string SourcePath, TimeSpan In, TimeSpan Out, TimeSpan Start, float Gain)
+{
+    public TimeSpan Duration => Out - In;
+
+    public bool HasSound => Gain > 0f;
 }
 
 public static class FFmpegArgumentBuilder
@@ -50,7 +59,7 @@ public static class FFmpegArgumentBuilder
                 items.Add(ExportItem.Gap(clip.LeadingGap));
             }
 
-            items.Add(new ExportItem(source.Path, clip.In, clip.Out, source.HasAudio));
+            items.Add(new ExportItem(source.Path, clip.In, clip.Out, source.HasAudio, clip.Audio.Gain));
         }
 
         return items;
@@ -86,12 +95,43 @@ public static class FFmpegArgumentBuilder
         return items;
     }
 
+    public static IReadOnlyList<AudioItem> BuildAudioItems(Timeline timeline, IReadOnlyDictionary<Guid, MediaSource> sources)
+    {
+        var items = new List<AudioItem>();
+
+        for (var trackIndex = timeline.FirstAudioTrackIndex; trackIndex < timeline.Tracks.Count; trackIndex++)
+        {
+            var start = TimeSpan.Zero;
+            foreach (var clip in timeline.Tracks[trackIndex].Clips)
+            {
+                start += clip.LeadingGap;
+
+                if (sources.TryGetValue(clip.SourceId, out var source) && source.HasAudio && clip.Audio.Gain > 0f)
+                {
+                    items.Add(new AudioItem(source.Path, clip.In, clip.Out, start, clip.Audio.Gain));
+                }
+
+                start += clip.Duration;
+            }
+        }
+
+        return items;
+    }
+
     public static string Build(IReadOnlyList<ExportItem> items, ExportSettings export, string outputPath) =>
-        Build(items, [], export, outputPath);
+        Build(items, [], [], export, outputPath);
 
     public static string Build(
         IReadOnlyList<ExportItem> items,
         IReadOnlyList<OverlayItem> overlays,
+        ExportSettings export,
+        string outputPath) =>
+        Build(items, overlays, [], export, outputPath);
+
+    public static string Build(
+        IReadOnlyList<ExportItem> items,
+        IReadOnlyList<OverlayItem> overlays,
+        IReadOnlyList<AudioItem> audio,
         ExportSettings export,
         string outputPath)
     {
@@ -122,9 +162,16 @@ public static class FFmpegArgumentBuilder
             args.Append(" -i ").Append(Quote(overlay.SourcePath));
         }
 
-        args.Append(" -filter_complex ").Append(Quote(BuildFilterGraph(items, overlays, export)));
+        foreach (var track in audio)
+        {
+            args.Append(" -ss ").Append(Seconds(track.In));
+            args.Append(" -t ").Append(Seconds(track.Duration));
+            args.Append(" -i ").Append(Quote(track.SourcePath));
+        }
+
+        args.Append(" -filter_complex ").Append(Quote(BuildFilterGraph(items, overlays, audio, export)));
         args.Append(" -map ").Append(Quote(VideoLabel(overlays, export)));
-        args.Append(" -map ").Append(Quote(AudioLabel(overlays, export)));
+        args.Append(" -map ").Append(Quote(AudioLabel(overlays, audio, export)));
         args.Append(" -c:v ").Append(export.VideoCodec);
         args.Append(" -crf ").Append(export.Crf.ToString(CultureInfo.InvariantCulture));
         args.Append(" -preset ").Append(export.Preset);
@@ -137,11 +184,18 @@ public static class FFmpegArgumentBuilder
     }
 
     public static string BuildFilterGraph(IReadOnlyList<ExportItem> items, ExportSettings export) =>
-        BuildFilterGraph(items, [], export);
+        BuildFilterGraph(items, [], [], export);
 
     public static string BuildFilterGraph(
         IReadOnlyList<ExportItem> items,
         IReadOnlyList<OverlayItem> overlays,
+        ExportSettings export) =>
+        BuildFilterGraph(items, overlays, [], export);
+
+    public static string BuildFilterGraph(
+        IReadOnlyList<ExportItem> items,
+        IReadOnlyList<OverlayItem> overlays,
+        IReadOnlyList<AudioItem> audio,
         ExportSettings export)
     {
         var width = export.Width.ToString(CultureInfo.InvariantCulture);
@@ -174,10 +228,15 @@ public static class FFmpegArgumentBuilder
 
             graph.Append("[v").Append(i).Append("];");
 
-            if (!item.IsGap && item.HasAudio)
+            if (item.HasSound)
             {
                 graph.Append('[').Append(input).Append(":a]");
                 graph.Append("aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo");
+
+                if (item.Gain < 1f)
+                {
+                    graph.Append(",volume=").Append(Number(item.Gain));
+                }
             }
             else
             {
@@ -200,7 +259,8 @@ public static class FFmpegArgumentBuilder
         graph.Append("concat=n=").Append(items.Count.ToString(CultureInfo.InvariantCulture)).Append(":v=1:a=1[v][a]");
 
         AppendOverlays(graph, items, overlays, export);
-        AppendSpeed(graph, overlays, export);
+        AppendMix(graph, items, overlays, audio);
+        AppendSpeed(graph, overlays, audio, export);
 
         return graph.ToString();
     }
@@ -220,14 +280,7 @@ public static class FFmpegArgumentBuilder
         }
 
         var fps = export.FrameRate.ToString(CultureInfo.InvariantCulture);
-        var input = 0;
-        foreach (var item in items)
-        {
-            if (!item.IsGap)
-            {
-                input++;
-            }
-        }
+        var input = InputCount(items);
 
         var accumulated = "[v]";
 
@@ -250,6 +303,16 @@ public static class FFmpegArgumentBuilder
 
             accumulated = "[acc" + k.ToString(CultureInfo.InvariantCulture) + "]";
         }
+    }
+
+    private static void AppendMix(
+        StringBuilder graph,
+        IReadOnlyList<ExportItem> items,
+        IReadOnlyList<OverlayItem> overlays,
+        IReadOnlyList<AudioItem> audio)
+    {
+        var overlayInput = InputCount(items);
+        var audioInput = overlayInput + overlays.Count;
 
         var mix = new StringBuilder();
         var mixInputs = 1;
@@ -261,15 +324,26 @@ public static class FFmpegArgumentBuilder
                 continue;
             }
 
-            var delay = Milliseconds(overlays[k].Start);
-
-            graph.Append(";[").Append(input + k).Append(":a]");
-            graph.Append("aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,");
-            graph.Append("volume=").Append(Number(overlays[k].Audio.Gain)).Append(',');
-            graph.Append("adelay=").Append(delay).Append('|').Append(delay);
+            graph.Append(';');
+            AppendDelayedSource(graph, overlayInput + k, overlays[k].Audio.Gain, overlays[k].Start);
             graph.Append("[oa").Append(k).Append(']');
 
             mix.Append("[oa").Append(k).Append(']');
+            mixInputs++;
+        }
+
+        for (var k = 0; k < audio.Count; k++)
+        {
+            if (!audio[k].HasSound)
+            {
+                continue;
+            }
+
+            graph.Append(';');
+            AppendDelayedSource(graph, audioInput + k, audio[k].Gain, audio[k].Start);
+            graph.Append("[aa").Append(k).Append(']');
+
+            mix.Append("[aa").Append(k).Append(']');
             mixInputs++;
         }
 
@@ -283,7 +357,21 @@ public static class FFmpegArgumentBuilder
         graph.Append(":normalize=0:dropout_transition=0[amixed]");
     }
 
-    private static void AppendSpeed(StringBuilder graph, IReadOnlyList<OverlayItem> overlays, ExportSettings export)
+    private static void AppendDelayedSource(StringBuilder graph, int input, float gain, TimeSpan start)
+    {
+        var delay = Milliseconds(start);
+
+        graph.Append('[').Append(input).Append(":a]");
+        graph.Append("aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,");
+        graph.Append("volume=").Append(Number(gain)).Append(',');
+        graph.Append("adelay=").Append(delay).Append('|').Append(delay);
+    }
+
+    private static void AppendSpeed(
+        StringBuilder graph,
+        IReadOnlyList<OverlayItem> overlays,
+        IReadOnlyList<AudioItem> audio,
+        ExportSettings export)
     {
         var speed = ExportSettings.ClampSpeed(export.Speed);
         if (!ChangesSpeed(speed))
@@ -296,9 +384,23 @@ public static class FFmpegArgumentBuilder
         graph.Append(",fps=").Append(export.FrameRate.ToString(CultureInfo.InvariantCulture));
         graph.Append(SpeedVideoLabel);
 
-        graph.Append(';').Append(ComposedAudioLabel(overlays));
+        graph.Append(';').Append(ComposedAudioLabel(overlays, audio));
         graph.Append(Tempo(speed));
         graph.Append(SpeedAudioLabel);
+    }
+
+    private static int InputCount(IReadOnlyList<ExportItem> items)
+    {
+        var input = 0;
+        foreach (var item in items)
+        {
+            if (!item.IsGap)
+            {
+                input++;
+            }
+        }
+
+        return input;
     }
 
     private static string Tempo(double speed) =>
@@ -314,21 +416,32 @@ public static class FFmpegArgumentBuilder
             ? SpeedVideoLabel
             : ComposedVideoLabel(overlays);
 
-    private static string AudioLabel(IReadOnlyList<OverlayItem> overlays, ExportSettings export) =>
+    private static string AudioLabel(
+        IReadOnlyList<OverlayItem> overlays,
+        IReadOnlyList<AudioItem> audio,
+        ExportSettings export) =>
         ChangesSpeed(ExportSettings.ClampSpeed(export.Speed))
             ? SpeedAudioLabel
-            : ComposedAudioLabel(overlays);
+            : ComposedAudioLabel(overlays, audio);
 
     private static string ComposedVideoLabel(IReadOnlyList<OverlayItem> overlays) =>
         overlays.Count == 0
             ? "[v]"
             : "[acc" + (overlays.Count - 1).ToString(CultureInfo.InvariantCulture) + "]";
 
-    private static string ComposedAudioLabel(IReadOnlyList<OverlayItem> overlays)
+    private static string ComposedAudioLabel(IReadOnlyList<OverlayItem> overlays, IReadOnlyList<AudioItem> audio)
     {
         foreach (var overlay in overlays)
         {
             if (overlay.HasSound)
+            {
+                return "[amixed]";
+            }
+        }
+
+        foreach (var track in audio)
+        {
+            if (track.HasSound)
             {
                 return "[amixed]";
             }

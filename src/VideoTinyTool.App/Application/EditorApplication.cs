@@ -768,6 +768,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         }
 
         var overlays = FFmpegArgumentBuilder.BuildOverlayItems(_timeline, _sourceIndex);
+        var audio = FFmpegArgumentBuilder.BuildAudioItems(_timeline, _sourceIndex);
 
         _progressDialog = new ProgressDialog(I18n.Dialogs.ExportingTitle, path);
         _progressDialog.AddButton(I18n.Dialogs.Cancel, ButtonStyle.Normal, () => _export.Cancel());
@@ -776,6 +777,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         _export.Start(
             items,
             overlays,
+            audio,
             _settings.Export,
             path,
             FFmpegArgumentBuilder.OutputDuration(_timeline.TotalDuration, _settings.Export));

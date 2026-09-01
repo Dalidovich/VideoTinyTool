@@ -21,8 +21,16 @@ public class FFmpegArgumentBuilderTests
         AudioBitrateKbps = 192
     };
 
-    private static ExportItem Item(string path, double inSeconds, double outSeconds, bool hasAudio = true) =>
-        new(path, TimeSpan.FromSeconds(inSeconds), TimeSpan.FromSeconds(outSeconds), hasAudio);
+    private static ExportItem Item(string path, double inSeconds, double outSeconds, bool hasAudio = true, float gain = 1f) =>
+        new(path, TimeSpan.FromSeconds(inSeconds), TimeSpan.FromSeconds(outSeconds), hasAudio, gain);
+
+    private static AudioItem Audio(string path, double inSeconds, double outSeconds, double startSeconds, float gain = 1f) =>
+        new(
+            path,
+            TimeSpan.FromSeconds(inSeconds),
+            TimeSpan.FromSeconds(outSeconds),
+            TimeSpan.FromSeconds(startSeconds),
+            gain);
 
     private static OverlayItem Overlay(
         string path,
@@ -517,5 +525,210 @@ public class FFmpegArgumentBuilderTests
 
         Assert.Single(overlays);
         Assert.Equal(TimeSpan.FromSeconds(3), overlays[0].Start);
+    }
+
+    [Fact]
+    public void NoAudioItemsAndFullGain_LeavesTheBaseGraphByteIdentical()
+    {
+        var items = new[]
+        {
+            Item(@"C:\media\a.mp4", 0, 4),
+            ExportItem.Gap(TimeSpan.FromSeconds(2)),
+            Item(@"C:\media\b.mp4", 1, 3, hasAudio: false)
+        };
+
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(items, [], [], Settings());
+
+        Assert.Equal(
+            "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease," +
+            "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v0];" +
+            "[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];" +
+            "color=c=black:s=1920x1080:r=30:d=2,setsar=1,format=yuv420p[v1];" +
+            "anullsrc=channel_layout=stereo:sample_rate=48000:d=2," +
+            "aformat=sample_fmts=fltp:channel_layouts=stereo[a1];" +
+            "[1:v]scale=1920:1080:force_original_aspect_ratio=decrease," +
+            "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v2];" +
+            "anullsrc=channel_layout=stereo:sample_rate=48000:d=2," +
+            "aformat=sample_fmts=fltp:channel_layouts=stereo[a2];" +
+            "[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[v][a]",
+            graph);
+
+        Assert.Equal(FFmpegArgumentBuilder.BuildFilterGraph(items, Settings()), graph);
+    }
+
+    [Fact]
+    public void QuietBaseClip_GetsAVolumeFilterOnItsOwnAudioChainOnly()
+    {
+        var items = new[]
+        {
+            Item(@"C:\media\a.mp4", 0, 4),
+            Item(@"C:\media\b.mp4", 0, 4, gain: 0.5f)
+        };
+
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(items, [], [], Settings());
+
+        Assert.Contains("[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];", graph);
+        Assert.Contains(
+            "[1:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=0.5[a1];",
+            graph);
+        Assert.Equal(1, graph.Split("volume=").Length - 1);
+        Assert.Contains("[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]", graph);
+    }
+
+    [Fact]
+    public void MutedBaseClip_BecomesSilenceOfItsOwnDuration()
+    {
+        var items = new[]
+        {
+            Item(@"C:\media\a.mp4", 0, 4),
+            Item(@"C:\media\b.mp4", 1, 3.5, gain: 0f)
+        };
+
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(items, [], [], Settings());
+
+        Assert.Contains(
+            "anullsrc=channel_layout=stereo:sample_rate=48000:d=2.5," +
+            "aformat=sample_fmts=fltp:channel_layouts=stereo[a1];",
+            graph);
+        Assert.DoesNotContain("volume=", graph);
+        Assert.DoesNotContain("[1:a]", graph);
+        Assert.Contains("[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]", graph);
+    }
+
+    [Fact]
+    public void AudioItem_IsInputAfterEveryOverlayAndIsDelayedIntoTheMix()
+    {
+        var items = new[] { Item(@"C:\media\a.mp4", 0, 20) };
+        var overlays = new[] { Overlay(@"C:\media\pip.mp4", 0, 3, 2, OverlayTransform.Default) };
+        var audio = new[] { Audio(@"C:\media\track.mp3", 5, 15, 1.5) };
+
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(items, overlays, audio, Settings());
+        var args = FFmpegArgumentBuilder.Build(items, overlays, audio, Settings(), @"C:\out\r.mp4");
+
+        Assert.EndsWith(
+            "[2:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo," +
+            "volume=1,adelay=1500|1500[aa0];" +
+            "[a][aa0]amix=inputs=2:normalize=0:dropout_transition=0[amixed]",
+            graph);
+        Assert.Contains(@"-i ""C:\media\pip.mp4"" -ss 5 -t 10 -i ""C:\media\track.mp3""", args);
+        Assert.Contains("-map \"[acc0]\" -map \"[amixed]\"", args);
+    }
+
+    [Fact]
+    public void OverlaySoundAndTwoAudioTracks_MixFourInputsInTrackThenStartOrder()
+    {
+        var video = TestData.Source();
+        var music = TestData.AudioSource();
+        var sources = new Dictionary<Guid, MediaSource> { [video.Id] = video, [music.Id] = music };
+
+        var timeline = new Timeline();
+        timeline.Add(TestData.Clip(video.Id, 0, 20));
+
+        timeline.AddTrack(TrackKind.Audio);
+        timeline.AddTrack(TrackKind.Audio);
+
+        var first = TestData.Clip(music.Id, 0, 4);
+        var second = TestData.Clip(music.Id, 10, 12);
+        timeline.Add(1, first);
+        timeline.Add(2, second);
+        timeline.SetLeadingGap(first, TimeSpan.FromSeconds(2));
+        timeline.SetLeadingGap(second, TimeSpan.FromSeconds(0.5));
+        timeline.SetClipAudio(second, new ClipAudio(0.25f, false));
+
+        var audio = FFmpegArgumentBuilder.BuildAudioItems(timeline, sources);
+
+        var items = new[] { Item(@"C:\media\a.mp4", 0, 20) };
+        var overlays = new[]
+        {
+            Overlay(@"C:\media\pip.mp4", 0, 3, 1, OverlayTransform.Default, hasAudio: true)
+        };
+
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(items, overlays, audio, Settings());
+
+        Assert.Equal(2, audio.Count);
+        Assert.Contains("volume=1,adelay=2000|2000[aa0]", graph);
+        Assert.Contains("volume=0.25,adelay=500|500[aa1]", graph);
+        Assert.EndsWith("[a][oa0][aa0][aa1]amix=inputs=4:normalize=0:dropout_transition=0[amixed]", graph);
+    }
+
+    [Fact]
+    public void MutedAudioTrack_ContributesNothingToTheMix()
+    {
+        var video = TestData.Source();
+        var music = TestData.AudioSource();
+        var sources = new Dictionary<Guid, MediaSource> { [video.Id] = video, [music.Id] = music };
+
+        var timeline = new Timeline();
+        timeline.Add(TestData.Clip(video.Id, 0, 20));
+        timeline.AddTrack(TrackKind.Audio);
+
+        var clip = TestData.Clip(music.Id, 0, 4);
+        timeline.Add(1, clip);
+        timeline.SetClipAudio(clip, new ClipAudio(1f, true));
+
+        var audio = FFmpegArgumentBuilder.BuildAudioItems(timeline, sources);
+
+        var items = new[] { Item(@"C:\media\a.mp4", 0, 20) };
+        var graph = FFmpegArgumentBuilder.BuildFilterGraph(items, [], audio, Settings());
+        var args = FFmpegArgumentBuilder.Build(items, [], audio, Settings(), @"C:\out\r.mp4");
+
+        Assert.Empty(audio);
+        Assert.DoesNotContain("[aa", graph);
+        Assert.DoesNotContain("amix", graph);
+        Assert.Contains("-map \"[v]\" -map \"[a]\"", args);
+    }
+
+    [Fact]
+    public void BuildAudioItems_SkipsSilentSourcesButKeepsLaterPositions()
+    {
+        var video = TestData.Source();
+        var silent = TestData.Source(hasAudio: false);
+        var music = TestData.AudioSource();
+        var sources = new Dictionary<Guid, MediaSource>
+        {
+            [video.Id] = video,
+            [silent.Id] = silent,
+            [music.Id] = music
+        };
+
+        var timeline = new Timeline();
+        timeline.Add(TestData.Clip(video.Id, 0, 20));
+        timeline.AddTrack(TrackKind.Audio);
+
+        timeline.Add(1, TestData.Clip(Guid.NewGuid(), 0, 3));
+        timeline.Add(1, TestData.Clip(silent.Id, 0, 2));
+        timeline.Add(1, TestData.Clip(music.Id, 4, 9));
+
+        var audio = FFmpegArgumentBuilder.BuildAudioItems(timeline, sources);
+
+        Assert.Single(audio);
+        Assert.Equal(music.Path, audio[0].SourcePath);
+        Assert.Equal(TimeSpan.FromSeconds(5), audio[0].Start);
+        Assert.Equal(TimeSpan.FromSeconds(5), audio[0].Duration);
+    }
+
+    [Fact]
+    public void AudioNumbers_UseInvariantFormattingUnderACommaDecimalCulture()
+    {
+        var previous = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("ru-RU");
+
+        try
+        {
+            var args = FFmpegArgumentBuilder.Build(
+                [Item(@"C:\media\a.mp4", 0, 10, gain: 0.75f)],
+                [],
+                [Audio(@"C:\media\track.mp3", 0.5, 4.25, 2.5, 0.125f)],
+                Settings(),
+                @"C:\out\r.mp4");
+
+            Assert.Contains("channel_layouts=stereo,volume=0.75[a0]", args);
+            Assert.Contains(@"-ss 0.5 -t 3.75 -i ""C:\media\track.mp3""", args);
+            Assert.Contains("volume=0.125,adelay=2500|2500[aa0]", args);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
     }
 }
