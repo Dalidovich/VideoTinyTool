@@ -31,6 +31,37 @@ public static class I18n
         public static string Help => _catalog.Text("toolbar.help");
     }
 
+    public static class Menu
+    {
+        public static string Split => _catalog.Text("menu.split");
+        public static string TrimIn => _catalog.Text("menu.trimIn");
+        public static string TrimOut => _catalog.Text("menu.trimOut");
+        public static string DetachAudio => _catalog.Text("menu.detachAudio");
+        public static string Mute => _catalog.Text("menu.mute");
+        public static string Unmute => _catalog.Text("menu.unmute");
+        public static string Delete => _catalog.Text("menu.delete");
+        public static string RippleDelete => _catalog.Text("menu.rippleDelete");
+
+        public static string AddTrack => _catalog.Text("menu.addTrack");
+        public static string AddAudioTrack => _catalog.Text("menu.addAudioTrack");
+        public static string RemoveTrack => _catalog.Text("menu.removeTrack");
+
+        public static string Undo => _catalog.Text("menu.undo");
+        public static string Redo => _catalog.Text("menu.redo");
+        public static string Import => _catalog.Text("menu.import");
+        public static string Export => _catalog.Text("menu.export");
+
+        public static string AddToTimeline => _catalog.Text("menu.addToTimeline");
+        public static string RemoveSource => _catalog.Text("menu.removeSource");
+
+        public static string Play => _catalog.Text("menu.play");
+        public static string Pause => _catalog.Text("menu.pause");
+        public static string GoToStart => _catalog.Text("menu.goToStart");
+        public static string GoToEnd => _catalog.Text("menu.goToEnd");
+        public static string ResetOverlay => _catalog.Text("menu.resetOverlay");
+        public static string Shortcuts => _catalog.Text("menu.shortcuts");
+    }
+
     public static class Help
     {
         public static string Title => _catalog.Text("help.title");
@@ -62,6 +93,7 @@ public static class I18n
         public static string ZoomAtCursor => _catalog.Text("help.zoomAtCursor");
         public static string ScrollTimeline => _catalog.Text("help.scrollTimeline");
         public static string ShowHelp => _catalog.Text("help.showHelp");
+        public static string ContextMenu => _catalog.Text("help.contextMenu");
         public static string AddTrack => _catalog.Text("help.addTrack");
         public static string RemoveTrack => _catalog.Text("help.removeTrack");
 

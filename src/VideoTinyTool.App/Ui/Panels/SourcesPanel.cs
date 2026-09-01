@@ -162,8 +162,38 @@ public sealed class SourcesPanel : PanelBase
         _hoverRemove = false;
     }
 
+    private void ShowMenu(Vector2f point)
+    {
+        var menu = new ContextMenu(point);
+        var index = _list.IndexAt(point);
+
+        if (index >= 0)
+        {
+            var source = _host.Sources[index];
+            _host.SelectSource(source);
+
+            menu.Add(
+                I18n.Menu.AddToTimeline,
+                string.Empty,
+                !_host.SourceMissing(source.Id),
+                () => _host.AppendSourceToTimeline(source));
+
+            menu.Add(I18n.Menu.RemoveSource, string.Empty, true, () => _host.RemoveSource(source));
+            menu.Separator();
+        }
+
+        menu.Add(I18n.Menu.Import, "Ctrl+O", true, _host.ImportFiles);
+        _host.ShowContextMenu(menu);
+    }
+
     public override void OnMouseDown(Vector2f point, Mouse.Button button, bool doubleClick)
     {
+        if (button == Mouse.Button.Right)
+        {
+            ShowMenu(point);
+            return;
+        }
+
         if (button != Mouse.Button.Left)
         {
             return;

@@ -765,8 +765,111 @@ public sealed class TimelinePanel : PanelBase
         return null;
     }
 
+    private void ShowMenu(Vector2f point)
+    {
+        if (_drag != DragMode.None)
+        {
+            return;
+        }
+
+        var body = BodyArea;
+        if (point.Y < body.Top || point.Y > body.Top + body.Height)
+        {
+            return;
+        }
+
+        var menu = new ContextMenu(point);
+        var overHeader = point.X < body.Left + Theme.TrackHeaderWidth;
+        var overRuler = point.Y < RulerBounds.Top + RulerBounds.Height;
+
+        if (!overHeader && !overRuler && ClipAt(point) is { } hit)
+        {
+            _host.SelectClip(hit.Clip);
+            AddClipItems(menu, hit.Clip, hit.TrackIndex);
+            menu.Separator();
+            AddHistoryItems(menu);
+        }
+        else
+        {
+            AddTrackItems(menu, overRuler ? -1 : TrackAt(point));
+            menu.Separator();
+            AddHistoryItems(menu);
+            menu.Separator();
+            menu.Add(I18n.Menu.Import, "Ctrl+O", true, _host.ImportFiles);
+            menu.Add(I18n.Menu.Export, "Ctrl+M", _host.Timeline.Clips.Count > 0, _host.ExportTimeline);
+        }
+
+        _host.ShowContextMenu(menu);
+    }
+
+    private void AddClipItems(ContextMenu menu, Clip clip, int trackIndex)
+    {
+        var source = _host.FindSource(clip.SourceId);
+        var offset = _host.Player.Position - _host.Timeline.StartOf(clip);
+        var inside = offset > TimeSpan.Zero && offset < clip.Duration;
+
+        menu.Add(
+            I18n.Menu.Split,
+            "S",
+            EditRules.CanSplit(clip, offset, EditRules.MinimumDuration(source)),
+            _host.SplitAtPlayhead);
+
+        menu.Add(I18n.Menu.TrimIn, "I", inside, () => _host.TrimSelectedToPlayhead(true));
+        menu.Add(I18n.Menu.TrimOut, "O", inside, () => _host.TrimSelectedToPlayhead(false));
+        menu.Separator();
+
+        menu.Add(
+            I18n.Menu.DetachAudio,
+            "Ctrl+U",
+            source is { HasAudio: true } && !_host.Timeline.IsAudioTrack(trackIndex),
+            () => _host.DetachAudio(clip));
+
+        menu.Add(
+            clip.Audio.Muted ? I18n.Menu.Unmute : I18n.Menu.Mute,
+            "M",
+            source is { HasAudio: true },
+            () => _host.ToggleClipMute(clip));
+
+        menu.Separator();
+        menu.Add(I18n.Menu.Delete, "Del", true, _host.RemoveSelectedClip);
+        menu.Add(I18n.Menu.RippleDelete, "Shift+Del", true, _host.RippleDeleteSelectedClip);
+    }
+
+    private void AddTrackItems(ContextMenu menu, int trackIndex)
+    {
+        menu.Add(
+            I18n.Menu.AddTrack,
+            "Ctrl+T",
+            VideoTrackCount < Domain.Timeline.MaxVideoTracks,
+            _host.AddTrack);
+
+        menu.Add(
+            I18n.Menu.AddAudioTrack,
+            "Ctrl+Shift+A",
+            _host.Timeline.AudioTrackCount < Domain.Timeline.MaxAudioTracks,
+            _host.AddAudioTrack);
+
+        menu.Add(
+            I18n.Menu.RemoveTrack,
+            "Ctrl+Shift+T",
+            trackIndex > 0 && trackIndex < TrackCount,
+            () => _host.RemoveTrack(trackIndex));
+    }
+
+    private void AddHistoryItems(ContextMenu menu)
+    {
+        menu.Add(I18n.Menu.Undo, "Ctrl+Z", _host.History.CanUndo, _host.Undo);
+        menu.Add(I18n.Menu.Redo, "Ctrl+Y", _host.History.CanRedo, _host.Redo);
+    }
+
     public override void OnMouseDown(Vector2f point, Mouse.Button button, bool doubleClick)
     {
+        if (button == Mouse.Button.Right)
+        {
+            ShowMenu(point);
+            return;
+        }
+
         if (button != Mouse.Button.Left)
         {
             return;

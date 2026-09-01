@@ -46,6 +46,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     private readonly Queue<ModalDialog> _dialogQueue = new();
     private ModalDialog? _dialog;
+    private ContextMenu? _menu;
     private ProgressDialog? _progressDialog;
     private ExportResult? _exportResult;
 
@@ -106,7 +107,11 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         _window.MouseButtonReleased += (_, e) => OnMouseUp(e);
         _window.MouseMoved += (_, e) => OnMouseMove(e);
         _window.MouseWheelScrolled += (_, e) => OnScroll(e);
-        _window.LostFocus += (_, _) => _input.ReleaseCapture();
+        _window.LostFocus += (_, _) =>
+        {
+            _input.ReleaseCapture();
+            _menu = null;
+        };
 
         _export.Finished += result => _exportResult = result;
 
@@ -146,6 +151,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             AdvanceReverseShuttle();
             PumpExport();
             PumpDialogs();
+            PumpMenu();
             ScanForMissingSources();
 
             if (_player.IsPlaying)
@@ -170,6 +176,13 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         _sourcesPanel.Draw(_renderer);
         _previewPanel.Draw(_renderer);
         _timelinePanel.Draw(_renderer);
+
+        if (_menu is not null)
+        {
+            _menu.Layout(_renderer, _window.Size.X, _window.Size.Y);
+            _menu.UpdateHover(_pointer);
+            _menu.Draw(_renderer);
+        }
 
         if (_dialog is not null)
         {
@@ -210,6 +223,13 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             return;
         }
 
+        if (_menu is not null)
+        {
+            _menu.OnMouseDown(point, e.Button);
+            PumpMenu();
+            return;
+        }
+
         _input.MouseDown(point, e.Button);
     }
 
@@ -221,6 +241,11 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         if (_dialog is not null)
         {
             _dialog.OnMouseUp(point);
+            return;
+        }
+
+        if (_menu is not null)
+        {
             return;
         }
 
@@ -238,12 +263,18 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             return;
         }
 
+        if (_menu is not null)
+        {
+            _menu.UpdateHover(point);
+            return;
+        }
+
         _input.MouseMove(point);
     }
 
     private void OnScroll(MouseWheelScrollEventArgs e)
     {
-        if (_dialog is not null)
+        if (_dialog is not null || _menu is not null)
         {
             return;
         }
@@ -279,6 +310,17 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             }
 
             return;
+        }
+
+        if (_menu is not null)
+        {
+            _menu.Close();
+            PumpMenu();
+
+            if (e.Code == Keyboard.Key.Escape)
+            {
+                return;
+            }
         }
 
         Dispatch(Shortcuts.Resolve(e));
@@ -969,6 +1011,25 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     public void ShowShortcuts() => ShowDialog(new HelpDialog());
 
+    public void ShowContextMenu(ContextMenu menu)
+    {
+        if (menu.IsEmpty)
+        {
+            return;
+        }
+
+        _input.ReleaseCapture();
+        _menu = menu;
+    }
+
+    private void PumpMenu()
+    {
+        if (_menu is { Closed: true })
+        {
+            _menu = null;
+        }
+    }
+
     private void ShowMessage(string title, string message)
     {
         var dialog = new ModalDialog(title, message);
@@ -978,6 +1039,8 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     private void ShowDialog(ModalDialog dialog)
     {
+        _menu = null;
+
         if (_dialog is null)
         {
             _dialog = dialog;

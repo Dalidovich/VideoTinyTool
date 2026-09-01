@@ -2,6 +2,7 @@ using VideoTinyTool.Application;
 using VideoTinyTool.Commands;
 using VideoTinyTool.Domain;
 using VideoTinyTool.Media;
+using VideoTinyTool.Ui.Widgets;
 
 namespace VideoTinyTool.Ui;
 
@@ -71,6 +72,8 @@ public interface IEditorHost
 
     void RemoveSelectedClip();
 
+    void RippleDeleteSelectedClip();
+
     void TrimSelectedToPlayhead(bool trimIn);
 
     void Undo();
@@ -78,4 +81,6 @@ public interface IEditorHost
     void Redo();
 
     void ShowShortcuts();
+
+    void ShowContextMenu(ContextMenu menu);
 }

@@ -558,8 +558,45 @@ public sealed class PreviewPanel : PanelBase
         _scrub.OnMouseMove(point);
     }
 
+    private void ShowMenu(Vector2f point)
+    {
+        var hasClips = _host.Timeline.Clips.Count > 0;
+        var menu = new ContextMenu(point);
+
+        menu.Add(
+            _host.Player.IsPlaying ? I18n.Menu.Pause : I18n.Menu.Play,
+            "Space",
+            hasClips,
+            _host.TogglePlayback);
+
+        menu.Add(I18n.Menu.GoToStart, "Home", hasClips, () => _host.SeekTo(TimeSpan.Zero, false));
+        menu.Add(I18n.Menu.GoToEnd, "End", hasClips, () => _host.SeekTo(_host.Timeline.TotalDuration, false));
+        menu.Separator();
+        menu.Add(I18n.Menu.Split, "S", _host.SelectedClip is not null, _host.SplitAtPlayhead);
+
+        if (OverlayClip is { } clip)
+        {
+            menu.Add(
+                I18n.Menu.ResetOverlay,
+                string.Empty,
+                clip.Overlay != OverlayTransform.Default,
+                ResetOverlay);
+        }
+
+        menu.Separator();
+        menu.Add(I18n.Menu.Shortcuts, "F1", true, _host.ShowShortcuts);
+
+        _host.ShowContextMenu(menu);
+    }
+
     public override void OnMouseDown(Vector2f point, Mouse.Button button, bool doubleClick)
     {
+        if (button == Mouse.Button.Right)
+        {
+            ShowMenu(point);
+            return;
+        }
+
         if (button != Mouse.Button.Left)
         {
             return;
