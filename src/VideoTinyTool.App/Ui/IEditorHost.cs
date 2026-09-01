@@ -21,6 +21,8 @@ public interface IEditorHost
 
     ThumbnailService Thumbnails { get; }
 
+    WaveformService Waveforms { get; }
+
     CommandHistory History { get; }
 
     AppSettings Settings { get; }

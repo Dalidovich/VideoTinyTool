@@ -39,6 +39,8 @@ public static class Theme
     public static readonly Color ClipOverlayBorder = Rgb(0x33264A);
     public static readonly Color ClipAudioFace = Rgb(0x2F5A4A);
     public static readonly Color ClipAudioBorder = Rgb(0x1F4034);
+    public static readonly Color Waveform = Rgb(0x9BEBC6);
+    public static readonly Color WaveformDim = Rgb(0x6FBE9C);
     public static readonly Color ClipMissing = Rgb(0x5A2B2B);
     public static readonly Color ClipMissingBorder = Rgb(0x8A4040);
 

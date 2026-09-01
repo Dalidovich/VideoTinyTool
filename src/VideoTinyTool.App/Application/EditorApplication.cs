@@ -34,6 +34,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
     private readonly HashSet<Guid> _missingSources = new();
 
     private readonly ThumbnailService _thumbnails = new();
+    private readonly WaveformService _waveforms = new();
     private readonly StillFrameService _stillFrames = new();
     private readonly PreviewPlayer _player;
     private readonly ExportService _export = new();
@@ -127,6 +128,8 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     public ThumbnailService Thumbnails => _thumbnails;
 
+    public WaveformService Waveforms => _waveforms;
+
     public CommandHistory History => _history;
 
     public AppSettings Settings => _settings;
@@ -138,6 +141,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             _window.DispatchEvents();
 
             _thumbnails.PumpCompleted();
+            _waveforms.PumpCompleted();
             _player.Update();
             AdvanceReverseShuttle();
             PumpExport();
@@ -553,6 +557,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         _sourceIndex.Remove(source.Id);
         _missingSources.Remove(source.Id);
         _thumbnails.Forget(source.Id);
+        _waveforms.Forget(source.Id);
 
         if (_selectedSource is not null && _selectedSource.Id == source.Id)
         {
@@ -1049,6 +1054,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         _player.Dispose();
         _stillFrames.Dispose();
         _thumbnails.Dispose();
+        _waveforms.Dispose();
         _renderer.Dispose();
         _fonts.Dispose();
         _window.Dispose();

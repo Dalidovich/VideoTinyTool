@@ -4,6 +4,7 @@ using SFML.Window;
 using VideoTinyTool.Commands;
 using VideoTinyTool.Domain;
 using VideoTinyTool.Localization;
+using VideoTinyTool.Media;
 using VideoTinyTool.Ui.Widgets;
 
 namespace VideoTinyTool.Ui.Panels;
@@ -16,6 +17,7 @@ public sealed class TimelinePanel : PanelBase
     private const float ClipPadding = 8f;
     private const float TrackButtonSize = 15f;
     private const float LaneWheelStep = 24f;
+    private const float TitleStripHeight = 17f;
     private const int MaxTracks = Domain.Timeline.MaxVideoTracks + Domain.Timeline.MaxAudioTracks;
 
     private static readonly double[] TickSteps =
@@ -378,6 +380,11 @@ public sealed class TimelinePanel : PanelBase
             DrawFilmstrip(renderer, clip, source, bounds);
         }
 
+        if (!missing && look == ClipLook.Audio && source is not null && bounds.Width > 2)
+        {
+            DrawWaveform(renderer, clip, source, bounds, selected);
+        }
+
         renderer.StrokeRect(bounds, missing
             ? Theme.ClipMissingBorder
             : selected
@@ -466,6 +473,58 @@ public sealed class TimelinePanel : PanelBase
         renderer.DrawText(text, badge.Left + 3f, badge.Top, Theme.FontSizeLabel, ink, TextFont.Mono);
 
         return width;
+    }
+
+    private void DrawWaveform(
+        Renderer renderer,
+        Clip clip,
+        Domain.MediaSource source,
+        FloatRect bounds,
+        bool selected)
+    {
+        var top = bounds.Height > TitleStripHeight + 8f ? bounds.Top + TitleStripHeight : bounds.Top;
+        var height = bounds.Top + bounds.Height - top;
+        var centre = MathF.Round(top + (height / 2f));
+        var half = MathF.Max(1f, (height / 2f) - 1f);
+        var ink = selected ? Theme.Waveform : Theme.WaveformDim;
+
+        renderer.PushClip(bounds);
+        renderer.HorizontalLine(bounds.Left, centre, bounds.Width, ink);
+
+        var peaks = source.HasAudio ? _host.Waveforms.Get(source) : null;
+        var gain = clip.Audio.Gain;
+
+        if (peaks is { Length: > 0 } && gain > 0f)
+        {
+            var lane = LaneBounds;
+            var first = (int)MathF.Max(0f, lane.Left - bounds.Left);
+            var last = (int)MathF.Min(bounds.Width, lane.Left + lane.Width - bounds.Left);
+            var span = peaks.AsSpan();
+
+            for (var column = first; column < last; column++)
+            {
+                var (from, to) = WaveformGeometry.ColumnRange(clip.In, column, 1f, _pixelsPerSecond);
+                if (from >= clip.Out)
+                {
+                    break;
+                }
+
+                var peak = WaveformGeometry.PeakBetween(
+                    span,
+                    WaveformGeometry.BucketAt(from, WaveformService.BucketsPerSecond),
+                    WaveformGeometry.BucketAt(to, WaveformService.BucketsPerSecond));
+
+                var amplitude = peak / 255f * gain * half;
+                if (amplitude < 0.5f)
+                {
+                    continue;
+                }
+
+                renderer.FillRect(bounds.Left + column, centre - amplitude, 1f, amplitude * 2f, ink);
+            }
+        }
+
+        renderer.PopClip();
     }
 
     private void DrawFilmstrip(Renderer renderer, Clip clip, Domain.MediaSource source, FloatRect bounds)
