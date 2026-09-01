@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace VideoTinyTool.Application;
 
@@ -8,6 +9,12 @@ public static class SettingsLoader
     {
         PropertyNameCaseInsensitive = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true
+    };
+
+    private static readonly JsonDocumentOptions NodeReadOptions = new()
+    {
+        CommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true
     };
 
@@ -51,6 +58,42 @@ public static class SettingsLoader
             return defaults;
         }
     }
+
+    public static string? TrySaveLanguage(string path, string language)
+    {
+        try
+        {
+            var root = File.Exists(path)
+                ? JsonNode.Parse(File.ReadAllText(path), null, NodeReadOptions) as JsonObject ?? new JsonObject()
+                : new JsonObject();
+
+            Set(Section(root, "ui"), "language", language);
+            File.WriteAllText(path, root.ToJsonString(WriteOptions));
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
+    private static JsonObject Section(JsonObject root, string name)
+    {
+        if (Key(root, name) is { } existing && root[existing] is JsonObject section)
+        {
+            return section;
+        }
+
+        var created = new JsonObject();
+        root[Key(root, name) ?? name] = created;
+        return created;
+    }
+
+    private static void Set(JsonObject target, string name, string value) => target[Key(target, name) ?? name] = value;
+
+    private static string? Key(JsonObject target, string name) => target
+        .Select(property => property.Key)
+        .FirstOrDefault(key => string.Equals(key, name, StringComparison.OrdinalIgnoreCase));
 
     private static void TryWrite(string path, AppSettings settings, out string? error)
     {

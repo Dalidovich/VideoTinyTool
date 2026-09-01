@@ -1,6 +1,7 @@
 using VideoTinyTool.Application;
 using VideoTinyTool.Commands;
 using VideoTinyTool.Domain;
+using VideoTinyTool.Localization;
 using VideoTinyTool.Media;
 using VideoTinyTool.Ui.Widgets;
 
@@ -27,6 +28,8 @@ public interface IEditorHost
     CommandHistory History { get; }
 
     AppSettings Settings { get; }
+
+    IReadOnlyList<LanguageOption> Languages { get; }
 
     MediaSource? FindSource(Guid id);
 
@@ -83,4 +86,6 @@ public interface IEditorHost
     void ShowShortcuts();
 
     void ShowContextMenu(ContextMenu menu);
+
+    void SwitchLanguage(string language);
 }

@@ -48,8 +48,11 @@ public class LocalizationKeyParityTests
         }
     }
 
-    private static IEnumerable<string> RequiredForms(string language) =>
-        Enumerable.Range(0, 201).Select(count => PluralRules.Form(language, count)).Distinct();
+    private static IEnumerable<string> RequiredForms(string language)
+    {
+        var rule = Flatten(language).GetValueOrDefault(LocalizationCatalog.PluralKey, PluralRules.RuleFor(language));
+        return Enumerable.Range(0, 201).Select(count => PluralRules.Form(rule, count)).Distinct();
+    }
 
     private static bool IsPluralForm(string key) => PluralForms.Contains(key[(key.LastIndexOf('.') + 1)..]);
 

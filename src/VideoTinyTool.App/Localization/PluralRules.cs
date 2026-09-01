@@ -2,12 +2,18 @@ namespace VideoTinyTool.Localization;
 
 public static class PluralRules
 {
+    public const string Slavic = "slavic";
+    public const string OneOther = "one-other";
+
     private static readonly string[] SlavicLanguages = ["ru", "uk", "be"];
 
-    public static string Form(string language, int count)
+    public static string RuleFor(string language) =>
+        SlavicLanguages.Contains(language, StringComparer.OrdinalIgnoreCase) ? Slavic : OneOther;
+
+    public static string Form(string rule, int count)
     {
         var value = Math.Abs(count);
-        return SlavicLanguages.Contains(language, StringComparer.OrdinalIgnoreCase)
+        return string.Equals(rule, Slavic, StringComparison.OrdinalIgnoreCase)
             ? SlavicForm(value)
             : value == 1 ? "one" : "other";
     }

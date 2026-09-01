@@ -6,11 +6,15 @@ public static class I18n
 {
     private static LocalizationCatalog _catalog = LocalizationCatalog.BuiltIn();
 
-    public static string Language => _catalog.Language;
-
     public static string? Warning => _catalog.Warning;
 
     public static void Use(LocalizationCatalog catalog) => _catalog = catalog;
+
+    public static class Language
+    {
+        public static string Code => _catalog.Language;
+        public static string Badge => Code.ToUpperInvariant();
+    }
 
     public static class Brand
     {
@@ -274,6 +278,9 @@ public static class I18n
 
         public static string SettingsNotCreated(string reason) =>
             _catalog.Format("startup.settingsNotCreated", reason);
+
+        public static string SettingsNotSaved(string reason) =>
+            _catalog.Format("startup.settingsNotSaved", reason);
     }
 
     public static class Probe

@@ -1,4 +1,8 @@
 {
+  "language": {
+    "name": "English",
+    "plural": "one-other"
+  },
   "brand": {
     "head": "Video",
     "accent": "Tiny",
@@ -186,6 +190,7 @@
     "missingFonts": "These font files are missing next to the executable, system fonts are used instead:\n{0}",
     "settingsUnreadable": "settings.json could not be read, defaults are used.\n{0}",
     "settingsNotCreated": "settings.json could not be created next to the executable.\n{0}",
+    "settingsNotSaved": "The language choice could not be saved to settings.json, it applies to this session only.\n{0}",
     "localizationMissing": "The localization file for “{0}” was not found at {1}. The built-in English text is used.",
     "localizationUnreadable": "The localization file {0} could not be read, the built-in English text is used.\n{1}"
   },

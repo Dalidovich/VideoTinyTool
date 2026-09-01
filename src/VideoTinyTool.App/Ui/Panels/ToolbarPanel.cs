@@ -16,8 +16,10 @@ public sealed class ToolbarPanel : PanelBase
     private readonly Button _redo = new(I18n.Toolbar.Redo, ButtonStyle.Ghost);
     private readonly Button _export = new(I18n.Toolbar.Export, ButtonStyle.Accent);
     private readonly Button _help = new(I18n.Toolbar.Help);
+    private readonly Button _language = new(I18n.Language.Badge, ButtonStyle.Ghost);
 
     private float _separatorX;
+    private float _timecodeRight;
 
     public ToolbarPanel(IEditorHost host)
     {
@@ -30,6 +32,7 @@ public sealed class ToolbarPanel : PanelBase
         _redo.Clicked += host.Redo;
         _export.Clicked += host.ExportTimeline;
         _help.Clicked += host.ShowShortcuts;
+        _language.Clicked += ShowLanguageMenu;
     }
 
     private IEnumerable<Button> Buttons
@@ -43,7 +46,39 @@ public sealed class ToolbarPanel : PanelBase
             yield return _redo;
             yield return _export;
             yield return _help;
+
+            if (LanguagePickerVisible)
+            {
+                yield return _language;
+            }
         }
+    }
+
+    private bool LanguagePickerVisible => _host.Languages.Count > 1;
+
+    public override void RefreshText()
+    {
+        _import.Label = I18n.Toolbar.Import;
+        _split.Label = I18n.Toolbar.Split;
+        _remove.Label = I18n.Toolbar.Remove;
+        _undo.Label = I18n.Toolbar.Undo;
+        _redo.Label = I18n.Toolbar.Redo;
+        _export.Label = I18n.Toolbar.Export;
+        _help.Label = I18n.Toolbar.Help;
+        _language.Label = I18n.Language.Badge;
+    }
+
+    private void ShowLanguageMenu()
+    {
+        var menu = new ContextMenu(new Vector2f(_language.Bounds.Left, _language.Bounds.Top + _language.Bounds.Height + 2f));
+
+        foreach (var option in _host.Languages)
+        {
+            var code = option.Code;
+            menu.Add(option.Name, option.Badge, code != I18n.Language.Code, () => _host.SwitchLanguage(code));
+        }
+
+        _host.ShowContextMenu(menu);
     }
 
     public void Layout(Renderer renderer)
@@ -80,6 +115,20 @@ public sealed class ToolbarPanel : PanelBase
         _help.Bounds = new FloatRect(
             new Vector2f(MathF.Round(_export.Bounds.Left - 8f - helpWidth), MathF.Round(top)),
             new Vector2f(helpWidth, height));
+
+        _timecodeRight = _help.Bounds.Left;
+
+        if (!LanguagePickerVisible)
+        {
+            return;
+        }
+
+        var languageWidth = Math.Max(height, _language.PreferredWidth(renderer));
+        _language.Bounds = new FloatRect(
+            new Vector2f(MathF.Round(_help.Bounds.Left - 6f - languageWidth), MathF.Round(top)),
+            new Vector2f(languageWidth, height));
+
+        _timecodeRight = _language.Bounds.Left;
     }
 
     private void RefreshEnabled()
@@ -113,7 +162,7 @@ public sealed class ToolbarPanel : PanelBase
 
         renderer.DrawText(
             TimeFormat.Timecode(_host.Timeline.TotalDuration),
-            _help.Bounds.Left - 14f,
+            _timecodeRight - 14f,
             Bounds.Top + 12f,
             Theme.FontSizeSmall,
             Theme.TextDim,

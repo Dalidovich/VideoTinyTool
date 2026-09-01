@@ -83,6 +83,17 @@ public sealed class TimelinePanel : PanelBase
         }
     }
 
+    public override void RefreshText()
+    {
+        _addTrack.Label = I18n.Timeline.AddTrack;
+        _addAudioTrack.Label = I18n.Timeline.AddAudioTrack;
+
+        foreach (var button in _removeTrack)
+        {
+            button.Label = I18n.Timeline.RemoveTrack;
+        }
+    }
+
     private IEnumerable<Button> TrackButtons
     {
         get

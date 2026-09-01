@@ -7,6 +7,8 @@ namespace VideoTinyTool.Localization;
 public sealed class LocalizationCatalog
 {
     public const string DefaultLanguage = "en";
+    public const string NameKey = "language.name";
+    public const string PluralKey = "language.plural";
 
     private const string BuiltInResource = "localization/en.json";
     private const string OtherForm = "other";
@@ -23,13 +25,21 @@ public sealed class LocalizationCatalog
     {
         Language = language;
         _strings = strings;
+        PluralRule = PluralRules.RuleFor(language);
     }
 
     public string Language { get; }
 
+    public string PluralRule { get; private set; }
+
     public string? Warning { get; private set; }
 
-    public static LocalizationCatalog BuiltIn() => new(DefaultLanguage, ReadBuiltIn());
+    public static LocalizationCatalog BuiltIn()
+    {
+        var catalog = new LocalizationCatalog(DefaultLanguage, ReadBuiltIn());
+        catalog.AdoptPluralRule(catalog._strings);
+        return catalog;
+    }
 
     public static LocalizationCatalog Load(string language)
     {
@@ -44,8 +54,7 @@ public sealed class LocalizationCatalog
 
         try
         {
-            using var document = JsonDocument.Parse(File.ReadAllText(path), ReadOptions);
-            Flatten(document.RootElement, string.Empty, catalog._strings);
+            catalog.Merge(ReadFile(path));
         }
         catch (Exception ex)
         {
@@ -53,6 +62,15 @@ public sealed class LocalizationCatalog
         }
 
         return catalog;
+    }
+
+    public static Dictionary<string, string> ReadFile(string path)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(path), ReadOptions);
+
+        var strings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        Flatten(document.RootElement, string.Empty, strings);
+        return strings;
     }
 
     public string Text(string key) => _strings.TryGetValue(key, out var value) ? value : key;
@@ -72,8 +90,26 @@ public sealed class LocalizationCatalog
 
     public string Plural(string key, int count, params object?[] arguments)
     {
-        var form = $"{key}.{PluralRules.Form(Language, count)}";
+        var form = $"{key}.{PluralRules.Form(PluralRule, count)}";
         return Format(_strings.ContainsKey(form) ? form : $"{key}.{OtherForm}", arguments);
+    }
+
+    private void Merge(Dictionary<string, string> overrides)
+    {
+        AdoptPluralRule(overrides);
+
+        foreach (var (key, value) in overrides)
+        {
+            _strings[key] = value;
+        }
+    }
+
+    private void AdoptPluralRule(Dictionary<string, string> source)
+    {
+        if (source.TryGetValue(PluralKey, out var rule) && !string.IsNullOrWhiteSpace(rule))
+        {
+            PluralRule = rule.Trim();
+        }
     }
 
     private static Dictionary<string, string> ReadBuiltIn()

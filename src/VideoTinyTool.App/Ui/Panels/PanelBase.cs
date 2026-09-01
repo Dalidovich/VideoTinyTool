@@ -12,6 +12,10 @@ public abstract class PanelBase
 
     public abstract void Draw(Renderer renderer);
 
+    public virtual void RefreshText()
+    {
+    }
+
     public virtual void OnMouseDown(Vector2f point, Mouse.Button button, bool doubleClick)
     {
     }

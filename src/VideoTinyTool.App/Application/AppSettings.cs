@@ -81,14 +81,8 @@ public sealed class AppSettings
         Ui.Language = SanitizeLanguage(Ui.Language);
     }
 
-    private static string SanitizeLanguage(string? value)
-    {
-        var language = (value ?? string.Empty).Trim().ToLowerInvariant();
-        var usable = language.Length is > 0 and <= 16
-                     && language.All(character => char.IsAsciiLetterOrDigit(character) || character == '-');
-
-        return usable ? language : LocalizationCatalog.DefaultLanguage;
-    }
+    private static string SanitizeLanguage(string? value) =>
+        LanguageIndex.Normalize(value) ?? LocalizationCatalog.DefaultLanguage;
 
     private static string Fallback(string? value, string standard) =>
         string.IsNullOrWhiteSpace(value) ? standard : value.Trim();

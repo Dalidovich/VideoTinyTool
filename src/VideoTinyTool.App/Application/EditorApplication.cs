@@ -44,6 +44,8 @@ public sealed class EditorApplication : IEditorHost, IDisposable
     private readonly PreviewPanel _previewPanel;
     private readonly TimelinePanel _timelinePanel;
 
+    private readonly IReadOnlyList<LanguageOption> _languages = LanguageIndex.Scan();
+
     private readonly Queue<ModalDialog> _dialogQueue = new();
     private ModalDialog? _dialog;
     private ContextMenu? _menu;
@@ -138,6 +140,8 @@ public sealed class EditorApplication : IEditorHost, IDisposable
     public CommandHistory History => _history;
 
     public AppSettings Settings => _settings;
+
+    public IReadOnlyList<LanguageOption> Languages => _languages;
 
     public void Run()
     {
@@ -1010,6 +1014,34 @@ public sealed class EditorApplication : IEditorHost, IDisposable
     }
 
     public void ShowShortcuts() => ShowDialog(new HelpDialog());
+
+    public void SwitchLanguage(string language)
+    {
+        if (language == I18n.Language.Code)
+        {
+            return;
+        }
+
+        var catalog = LocalizationCatalog.Load(language);
+        I18n.Use(catalog);
+        _settings.Ui.Language = language;
+
+        _window.SetTitle(I18n.Brand.Full);
+        _toolbar.RefreshText();
+        _sourcesPanel.RefreshText();
+        _previewPanel.RefreshText();
+        _timelinePanel.RefreshText();
+
+        if (catalog.Warning is { Length: > 0 } warning)
+        {
+            ShowMessage(I18n.Dialogs.LocalizationTitle, warning);
+        }
+
+        if (SettingsLoader.TrySaveLanguage(AppPaths.SettingsFile, language) is { } error)
+        {
+            ShowMessage(I18n.Dialogs.SettingsTitle, I18n.Startup.SettingsNotSaved(error));
+        }
+    }
 
     public void ShowContextMenu(ContextMenu menu)
     {
