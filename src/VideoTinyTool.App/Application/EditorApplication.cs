@@ -374,8 +374,28 @@ public sealed class EditorApplication : IEditorHost, IDisposable
                 AddTrack();
                 break;
 
+            case EditorCommand.AddAudioTrack:
+                AddAudioTrack();
+                break;
+
             case EditorCommand.RemoveTrack:
                 RemoveTrack(SelectedTrackIndex);
+                break;
+
+            case EditorCommand.DetachAudio:
+                if (_selectedClip is not null)
+                {
+                    DetachAudio(_selectedClip);
+                }
+
+                break;
+
+            case EditorCommand.ToggleMute:
+                if (_selectedClip is not null)
+                {
+                    ToggleClipMute(_selectedClip);
+                }
+
                 break;
 
             case EditorCommand.Help:
@@ -559,6 +579,16 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         Execute(new AddTrackCommand());
     }
 
+    public void AddAudioTrack()
+    {
+        if (_timeline.AudioTrackCount >= Domain.Timeline.MaxAudioTracks)
+        {
+            return;
+        }
+
+        Execute(new AddTrackCommand(TrackKind.Audio));
+    }
+
     public void RemoveTrack(int index)
     {
         if (index <= 0 || index >= _timeline.Tracks.Count)
@@ -569,9 +599,19 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         Execute(new RemoveTrackCommand(index));
     }
 
+    public void DetachAudio(Clip clip) => Execute(new DetachAudioCommand(clip, FindSource(clip.SourceId)));
+
+    public void ToggleClipMute(Clip clip) =>
+        Execute(new SetClipAudioCommand(clip, clip.Audio with { Muted = !clip.Audio.Muted }));
+
     public void MoveClipToTrack(Clip clip, int trackIndex, TimeSpan start)
     {
-        if (FindSource(clip.SourceId) is { HasVideo: false } && !_timeline.IsAudioTrack(trackIndex))
+        if (trackIndex < 0 || trackIndex >= _timeline.Tracks.Count)
+        {
+            return;
+        }
+
+        if (!EditRules.CanPlaceOnTrack(FindSource(clip.SourceId), _timeline.Tracks[trackIndex].Kind))
         {
             return;
         }

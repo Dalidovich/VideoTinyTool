@@ -23,11 +23,33 @@ public static class LaneGeometry
     public static float ClampScroll(float scroll, float available, int trackCount) =>
         Math.Clamp(scroll, 0f, MaxScroll(available, trackCount));
 
-    public static float LaneOffset(float available, int trackCount, int trackIndex, float scroll) =>
-        ((trackCount - 1 - trackIndex) * LaneHeight(available, trackCount))
+    public static int RowOf(int videoCount, int trackCount, int trackIndex)
+    {
+        if (trackIndex < 0 || trackIndex >= trackCount)
+        {
+            return -1;
+        }
+
+        var video = Math.Clamp(videoCount, 0, trackCount);
+        return trackIndex < video ? video - 1 - trackIndex : trackIndex;
+    }
+
+    public static int TrackIndexAtRow(int videoCount, int trackCount, int row)
+    {
+        if (row < 0 || row >= trackCount)
+        {
+            return -1;
+        }
+
+        var video = Math.Clamp(videoCount, 0, trackCount);
+        return row < video ? video - 1 - row : row;
+    }
+
+    public static float LaneOffset(float available, int videoCount, int trackCount, int trackIndex, float scroll) =>
+        (RowOf(videoCount, trackCount, trackIndex) * LaneHeight(available, trackCount))
         - ClampScroll(scroll, available, trackCount);
 
-    public static int TrackIndexAt(float available, int trackCount, float scroll, float offsetY)
+    public static int TrackIndexAt(float available, int videoCount, int trackCount, float scroll, float offsetY)
     {
         if (trackCount <= 0 || offsetY < 0 || offsetY >= available)
         {
@@ -36,9 +58,8 @@ public static class LaneGeometry
 
         var row = (int)Math.Floor((offsetY + ClampScroll(scroll, available, trackCount))
                                   / LaneHeight(available, trackCount));
-        var index = trackCount - 1 - row;
 
-        return index < 0 || index >= trackCount ? -1 : index;
+        return TrackIndexAtRow(videoCount, trackCount, row);
     }
 
     public static TimeSpan DropStart(TimeSpan pointerTime, TimeSpan grabOffset)

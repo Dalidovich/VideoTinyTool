@@ -42,4 +42,14 @@ public static class EditRules
 
     public static bool CanSplit(Clip clip, TimeSpan offsetInClip, TimeSpan minimum) =>
         offsetInClip >= minimum && clip.Duration - offsetInClip >= minimum;
+
+    public static bool CanPlaceOnTrack(MediaSource? source, TrackKind kind)
+    {
+        if (source is null)
+        {
+            return true;
+        }
+
+        return kind == TrackKind.Audio ? source.HasAudio : source.HasVideo;
+    }
 }

@@ -32,15 +32,15 @@ public class LaneGeometryTests
     [Fact]
     public void BaseTrackSitsAtTheBottomOfTheStack()
     {
-        Assert.Equal(90f, LaneGeometry.LaneOffset(180f, 2, 0, 0f));
-        Assert.Equal(0f, LaneGeometry.LaneOffset(180f, 2, 1, 0f));
+        Assert.Equal(90f, LaneGeometry.LaneOffset(180f, 2, 2, 0, 0f));
+        Assert.Equal(0f, LaneGeometry.LaneOffset(180f, 2, 2, 1, 0f));
     }
 
     [Fact]
     public void ScrollShiftsTheWholeStackUp()
     {
-        Assert.Equal(132f - 40f, LaneGeometry.LaneOffset(120f, 4, 0, 40f));
-        Assert.Equal(-40f, LaneGeometry.LaneOffset(120f, 4, 3, 40f));
+        Assert.Equal(132f - 40f, LaneGeometry.LaneOffset(120f, 4, 4, 0, 40f));
+        Assert.Equal(-40f, LaneGeometry.LaneOffset(120f, 4, 4, 3, 40f));
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class LaneGeometryTests
     [InlineData(179f, 0)]
     public void TrackIndexFollowsTheVisualOrder(float offsetY, int expected)
     {
-        Assert.Equal(expected, LaneGeometry.TrackIndexAt(180f, 2, 0f, offsetY));
+        Assert.Equal(expected, LaneGeometry.TrackIndexAt(180f, 2, 2, 0f, offsetY));
     }
 
     [Theory]
@@ -66,14 +66,72 @@ public class LaneGeometryTests
     [InlineData(180f)]
     public void PointsOutsideTheLaneAreaResolveToNoTrack(float offsetY)
     {
-        Assert.Equal(-1, LaneGeometry.TrackIndexAt(180f, 2, 0f, offsetY));
+        Assert.Equal(-1, LaneGeometry.TrackIndexAt(180f, 2, 2, 0f, offsetY));
     }
 
     [Fact]
     public void ScrolledStackResolvesTheTrackUnderTheCursor()
     {
-        Assert.Equal(2, LaneGeometry.TrackIndexAt(120f, 4, 44f, 0f));
-        Assert.Equal(0, LaneGeometry.TrackIndexAt(120f, 4, 56f, 119f));
+        Assert.Equal(2, LaneGeometry.TrackIndexAt(120f, 4, 4, 44f, 0f));
+        Assert.Equal(0, LaneGeometry.TrackIndexAt(120f, 4, 4, 56f, 119f));
+    }
+
+    [Theory]
+    [InlineData(0, 3)]
+    [InlineData(1, 2)]
+    [InlineData(2, 1)]
+    [InlineData(3, 0)]
+    public void VideoOnlyStackKeepsTheBaseTrackAtTheBottom(int trackIndex, int expectedRow)
+    {
+        Assert.Equal(expectedRow, LaneGeometry.RowOf(4, 4, trackIndex));
+        Assert.Equal(trackIndex, LaneGeometry.TrackIndexAtRow(4, 4, expectedRow));
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 1)]
+    [InlineData(2, 2)]
+    public void AudioOnlyStackKeepsTheTrackOrder(int trackIndex, int expectedRow)
+    {
+        Assert.Equal(expectedRow, LaneGeometry.RowOf(0, 3, trackIndex));
+        Assert.Equal(trackIndex, LaneGeometry.TrackIndexAtRow(0, 3, expectedRow));
+    }
+
+    [Theory]
+    [InlineData(1, 0)]
+    [InlineData(0, 1)]
+    [InlineData(2, 2)]
+    [InlineData(3, 3)]
+    [InlineData(4, 4)]
+    public void MixedStackPutsVideoAboveTheBaseTrackAndAudioBelowIt(int trackIndex, int expectedRow)
+    {
+        Assert.Equal(expectedRow, LaneGeometry.RowOf(2, 5, trackIndex));
+        Assert.Equal(trackIndex, LaneGeometry.TrackIndexAtRow(2, 5, expectedRow));
+    }
+
+    [Fact]
+    public void RowsOutsideTheStackResolveToNoTrack()
+    {
+        Assert.Equal(-1, LaneGeometry.RowOf(2, 5, -1));
+        Assert.Equal(-1, LaneGeometry.RowOf(2, 5, 5));
+        Assert.Equal(-1, LaneGeometry.TrackIndexAtRow(2, 5, -1));
+        Assert.Equal(-1, LaneGeometry.TrackIndexAtRow(2, 5, 5));
+    }
+
+    [Fact]
+    public void AudioLanesSitUnderTheBaseTrack()
+    {
+        Assert.Equal(0f, LaneGeometry.LaneOffset(180f, 2, 3, 1, 0f));
+        Assert.Equal(60f, LaneGeometry.LaneOffset(180f, 2, 3, 0, 0f));
+        Assert.Equal(120f, LaneGeometry.LaneOffset(180f, 2, 3, 2, 0f));
+    }
+
+    [Fact]
+    public void PointerResolvesAudioLanesUnderTheBaseTrack()
+    {
+        Assert.Equal(1, LaneGeometry.TrackIndexAt(180f, 2, 3, 0f, 0f));
+        Assert.Equal(0, LaneGeometry.TrackIndexAt(180f, 2, 3, 0f, 60f));
+        Assert.Equal(2, LaneGeometry.TrackIndexAt(180f, 2, 3, 0f, 120f));
     }
 
     [Fact]

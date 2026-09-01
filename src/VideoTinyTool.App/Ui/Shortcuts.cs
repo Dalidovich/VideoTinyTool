@@ -27,7 +27,10 @@ public enum EditorCommand
     ZoomIn,
     ZoomOut,
     AddTrack,
+    AddAudioTrack,
     RemoveTrack,
+    DetachAudio,
+    ToggleMute,
     Help
 }
 
@@ -45,6 +48,8 @@ public static class Shortcuts
                 Keyboard.Key.O => EditorCommand.Import,
                 Keyboard.Key.M => EditorCommand.Export,
                 Keyboard.Key.T => key.Shift ? EditorCommand.RemoveTrack : EditorCommand.AddTrack,
+                Keyboard.Key.A when key.Shift => EditorCommand.AddAudioTrack,
+                Keyboard.Key.U => EditorCommand.DetachAudio,
                 _ => EditorCommand.None
             };
         }
@@ -74,6 +79,7 @@ public static class Shortcuts
             Keyboard.Key.I => EditorCommand.TrimIn,
             Keyboard.Key.O => EditorCommand.TrimOut,
             Keyboard.Key.S => EditorCommand.Split,
+            Keyboard.Key.M => EditorCommand.ToggleMute,
             Keyboard.Key.Delete => EditorCommand.Delete,
             Keyboard.Key.Add or Keyboard.Key.Equal => EditorCommand.ZoomIn,
             Keyboard.Key.Subtract or Keyboard.Key.Hyphen => EditorCommand.ZoomOut,

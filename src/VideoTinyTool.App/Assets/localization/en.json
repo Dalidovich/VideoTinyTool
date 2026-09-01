@@ -37,8 +37,12 @@
     "zoomAtCursor": "Zoom around the cursor",
     "scrollTimeline": "Scroll the timeline",
     "showHelp": "Open this list",
-    "addTrack": "Add a track",
+    "addTrack": "Add a video track",
     "removeTrack": "Remove the selected clip’s track",
+    "audio": "Audio",
+    "addAudioTrack": "Add an audio track",
+    "detachAudio": "Detach the selected clip’s audio",
+    "toggleMute": "Mute / unmute the selected clip",
     "confirm": "Confirm",
     "dismiss": "Cancel or close"
   },
@@ -75,8 +79,12 @@
     "noTimecode": "--:--.---",
     "zoom": "Zoom",
     "trackLabel": "V{0}",
-    "addTrack": "+",
+    "addTrack": "+V",
     "removeTrack": "×",
+    "audioTrackLabel": "A{0}",
+    "addAudioTrack": "+A",
+    "volumeBadge": "{0}%",
+    "mutedBadge": "M",
     "clipCount": {
       "one": "1 clip",
       "other": "{0} clips"

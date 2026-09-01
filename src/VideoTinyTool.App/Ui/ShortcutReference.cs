@@ -24,6 +24,12 @@ public static class ShortcutReference
             new ShortcutEntry("Ctrl+Wheel", I18n.Help.ZoomAtCursor),
             new ShortcutEntry("Wheel", I18n.Help.ScrollTimeline),
             new ShortcutEntry("F1", I18n.Help.ShowHelp)
+        ]),
+        new ShortcutGroup(I18n.Help.Audio,
+        [
+            new ShortcutEntry("Ctrl+Shift+A", I18n.Help.AddAudioTrack),
+            new ShortcutEntry("Ctrl+U", I18n.Help.DetachAudio),
+            new ShortcutEntry("M", I18n.Help.ToggleMute)
         ])
     ];
 

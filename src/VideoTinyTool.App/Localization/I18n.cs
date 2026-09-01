@@ -39,6 +39,7 @@ public static class I18n
         public static string Editing => _catalog.Text("help.editing");
         public static string Files => _catalog.Text("help.files");
         public static string View => _catalog.Text("help.view");
+        public static string Audio => _catalog.Text("help.audio");
         public static string Dialogs => _catalog.Text("help.dialogs");
 
         public static string PlayPause => _catalog.Text("help.playPause");
@@ -63,6 +64,10 @@ public static class I18n
         public static string ShowHelp => _catalog.Text("help.showHelp");
         public static string AddTrack => _catalog.Text("help.addTrack");
         public static string RemoveTrack => _catalog.Text("help.removeTrack");
+
+        public static string AddAudioTrack => _catalog.Text("help.addAudioTrack");
+        public static string DetachAudio => _catalog.Text("help.detachAudio");
+        public static string ToggleMute => _catalog.Text("help.toggleMute");
 
         public static string Confirm => _catalog.Text("help.confirm");
         public static string Dismiss => _catalog.Text("help.dismiss");
@@ -115,9 +120,16 @@ public static class I18n
         public static string NoTimecode => _catalog.Text("timeline.noTimecode");
         public static string Zoom => _catalog.Text("timeline.zoom");
         public static string AddTrack => _catalog.Text("timeline.addTrack");
+        public static string AddAudioTrack => _catalog.Text("timeline.addAudioTrack");
         public static string RemoveTrack => _catalog.Text("timeline.removeTrack");
+        public static string MutedBadge => _catalog.Text("timeline.mutedBadge");
 
         public static string TrackLabel(int number) => _catalog.Format("timeline.trackLabel", number);
+
+        public static string AudioTrackLabel(int number) => _catalog.Format("timeline.audioTrackLabel", number);
+
+        public static string VolumeBadge(float volume) =>
+            _catalog.Format("timeline.volumeBadge", (int)MathF.Round(volume * 100f));
 
         public static string ClipCount(int count) => _catalog.Plural("timeline.clipCount", count, count);
     }

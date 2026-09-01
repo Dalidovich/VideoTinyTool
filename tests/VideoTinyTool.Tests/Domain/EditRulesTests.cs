@@ -88,4 +88,40 @@ public class EditRulesTests
 
         Assert.True(EditRules.CanSplit(clip, TimeSpan.FromSeconds(2), OneFrameAt25));
     }
+
+    [Theory]
+    [InlineData(true, true, TrackKind.Video, true)]
+    [InlineData(true, true, TrackKind.Audio, true)]
+    [InlineData(true, false, TrackKind.Video, true)]
+    [InlineData(true, false, TrackKind.Audio, false)]
+    [InlineData(false, true, TrackKind.Video, false)]
+    [InlineData(false, true, TrackKind.Audio, true)]
+    [InlineData(false, false, TrackKind.Video, false)]
+    [InlineData(false, false, TrackKind.Audio, false)]
+    public void CanPlaceOnTrack_MatchesTheStreamsTheSourceHas(
+        bool hasVideo,
+        bool hasAudio,
+        TrackKind kind,
+        bool expected)
+    {
+        var source = new MediaSource(
+            Guid.NewGuid(),
+            @"C:\media\clip.mp4",
+            TimeSpan.FromSeconds(10),
+            1920,
+            1080,
+            25,
+            hasVideo ? "h264" : null,
+            hasAudio ? "aac" : null);
+
+        Assert.Equal(expected, EditRules.CanPlaceOnTrack(source, kind));
+    }
+
+    [Theory]
+    [InlineData(TrackKind.Video)]
+    [InlineData(TrackKind.Audio)]
+    public void CanPlaceOnTrack_AllowsAClipWhoseSourceIsGone(TrackKind kind)
+    {
+        Assert.True(EditRules.CanPlaceOnTrack(null, kind));
+    }
 }

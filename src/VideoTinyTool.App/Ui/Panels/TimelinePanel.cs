@@ -23,6 +23,13 @@ public sealed class TimelinePanel : PanelBase
         0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400
     ];
 
+    private enum ClipLook
+    {
+        Base,
+        Overlay,
+        Audio
+    }
+
     private enum DragMode
     {
         None,
@@ -37,6 +44,7 @@ public sealed class TimelinePanel : PanelBase
     private readonly IEditorHost _host;
     private readonly Slider _zoom = new() { ShowKnob = true, TrackHeight = 3f };
     private readonly Button _addTrack = new(I18n.Timeline.AddTrack);
+    private readonly Button _addAudioTrack = new(I18n.Timeline.AddAudioTrack);
     private readonly List<Button> _removeTrack = new();
 
     private float _pixelsPerSecond = 40f;
@@ -52,6 +60,7 @@ public sealed class TimelinePanel : PanelBase
     private int _dragToTrack = -1;
     private int _dragFromIndex = -1;
     private int _dragToIndex = -1;
+    private bool _dragRejected;
     private bool _wasPlayingBeforeDrag;
 
     public TimelinePanel(IEditorHost host)
@@ -61,6 +70,7 @@ public sealed class TimelinePanel : PanelBase
         _zoom.ValueChanged += value => SetZoom(ValueToZoom(value), LaneBounds.Left + (LaneBounds.Width / 2f));
 
         _addTrack.Clicked += _host.AddTrack;
+        _addAudioTrack.Clicked += _host.AddAudioTrack;
 
         for (var track = 1; track < MaxTracks; track++)
         {
@@ -76,6 +86,7 @@ public sealed class TimelinePanel : PanelBase
         get
         {
             yield return _addTrack;
+            yield return _addAudioTrack;
             foreach (var button in _removeTrack)
             {
                 yield return button;
@@ -84,6 +95,8 @@ public sealed class TimelinePanel : PanelBase
     }
 
     private int TrackCount => _host.Timeline.Tracks.Count;
+
+    private int VideoTrackCount => _host.Timeline.VideoTrackCount;
 
     private FloatRect BodyArea => new(
         new Vector2f(Bounds.Left, Bounds.Top + Theme.PanelHeaderHeight),
@@ -121,7 +134,12 @@ public sealed class TimelinePanel : PanelBase
         return new FloatRect(
             new Vector2f(
                 lane.Left,
-                lane.Top + LaneGeometry.LaneOffset(lane.Height, TrackCount, trackIndex, _laneScroll)),
+                lane.Top + LaneGeometry.LaneOffset(
+                    lane.Height,
+                    VideoTrackCount,
+                    TrackCount,
+                    trackIndex,
+                    _laneScroll)),
             new Vector2f(lane.Width, LaneHeight));
     }
 
@@ -162,10 +180,18 @@ public sealed class TimelinePanel : PanelBase
         }
 
         var baseCell = HeaderCell(0);
-        _addTrack.Enabled = _host.Timeline.VideoTrackCount < Domain.Timeline.MaxVideoTracks;
+        var buttonWidth = (baseCell.Width - 16f) / 2f;
+        var buttonTop = baseCell.Top + baseCell.Height - TrackButtonSize - 6f;
+
+        _addTrack.Enabled = VideoTrackCount < Domain.Timeline.MaxVideoTracks;
         _addTrack.Bounds = Reachable(new FloatRect(
-            new Vector2f(baseCell.Left + 6f, baseCell.Top + baseCell.Height - TrackButtonSize - 6f),
-            new Vector2f(baseCell.Width - 12f, TrackButtonSize)));
+            new Vector2f(baseCell.Left + 7f, buttonTop),
+            new Vector2f(buttonWidth, TrackButtonSize)));
+
+        _addAudioTrack.Enabled = _host.Timeline.AudioTrackCount < Domain.Timeline.MaxAudioTracks;
+        _addAudioTrack.Bounds = Reachable(new FloatRect(
+            new Vector2f(baseCell.Left + 9f + buttonWidth, buttonTop),
+            new Vector2f(buttonWidth, TrackButtonSize)));
     }
 
     private FloatRect Reachable(FloatRect bounds)
@@ -251,7 +277,7 @@ public sealed class TimelinePanel : PanelBase
             foreach (var clip in _host.Timeline.ClipsOf(track))
             {
                 start += clip.LeadingGap;
-                DrawClip(renderer, clip, start, row, track > 0 && !_host.Timeline.IsAudioTrack(track));
+                DrawClip(renderer, clip, start, row, LookOf(track));
                 start += clip.Duration;
             }
         }
@@ -260,12 +286,24 @@ public sealed class TimelinePanel : PanelBase
         renderer.PopClip();
     }
 
+    private ClipLook LookOf(int trackIndex) => _host.Timeline.IsAudioTrack(trackIndex)
+        ? ClipLook.Audio
+        : trackIndex > 0
+            ? ClipLook.Overlay
+            : ClipLook.Base;
+
+    private TrackKind KindOf(int trackIndex) => trackIndex >= 0 && trackIndex < TrackCount
+        ? _host.Timeline.Tracks[trackIndex].Kind
+        : TrackKind.Video;
+
     private void DrawTrackHeaders(Renderer renderer)
     {
         var column = HeaderColumn;
 
         renderer.FillRect(column, Theme.Chrome);
         renderer.PushClip(column);
+
+        var videoCount = VideoTrackCount;
 
         for (var track = 0; track < TrackCount; track++)
         {
@@ -281,7 +319,9 @@ public sealed class TimelinePanel : PanelBase
             }
 
             renderer.DrawText(
-                I18n.Timeline.TrackLabel(track + 1),
+                track < videoCount
+                    ? I18n.Timeline.TrackLabel(track + 1)
+                    : I18n.Timeline.AudioTrackLabel(track - videoCount + 1),
                 cell.Left + 15f,
                 cell.Top + 6f,
                 Theme.FontSizeLabel,
@@ -302,7 +342,7 @@ public sealed class TimelinePanel : PanelBase
         renderer.VerticalLine(column.Left + column.Width - 1, column.Top, column.Height, Theme.Line);
     }
 
-    private void DrawClip(Renderer renderer, Clip clip, TimeSpan globalStart, FloatRect row, bool overlay)
+    private void DrawClip(Renderer renderer, Clip clip, TimeSpan globalStart, FloatRect row, ClipLook look)
     {
         var lane = LaneBounds;
         var left = TimeToX(globalStart);
@@ -326,11 +366,14 @@ public sealed class TimelinePanel : PanelBase
             ? Theme.ClipMissing
             : selected
                 ? Theme.ClipSelected
-                : overlay
-                    ? Theme.ClipOverlayFace
-                    : Theme.ClipFace);
+                : look switch
+                {
+                    ClipLook.Overlay => Theme.ClipOverlayFace,
+                    ClipLook.Audio => Theme.ClipAudioFace,
+                    _ => Theme.ClipFace
+                });
 
-        if (!missing && source is { HasVideo: true } && bounds.Width > 8)
+        if (!missing && look != ClipLook.Audio && source is { HasVideo: true } && bounds.Width > 8)
         {
             DrawFilmstrip(renderer, clip, source, bounds);
         }
@@ -339,9 +382,12 @@ public sealed class TimelinePanel : PanelBase
             ? Theme.ClipMissingBorder
             : selected
                 ? Theme.Accent
-                : overlay
-                    ? Theme.ClipOverlayBorder
-                    : Theme.ClipBorder);
+                : look switch
+                {
+                    ClipLook.Overlay => Theme.ClipOverlayBorder,
+                    ClipLook.Audio => Theme.ClipAudioBorder,
+                    _ => Theme.ClipBorder
+                });
 
         renderer.PushClip(bounds);
 
@@ -349,9 +395,10 @@ public sealed class TimelinePanel : PanelBase
             new FloatRect(bounds.Position, new Vector2f(bounds.Width, 17)),
             Theme.WithAlpha(Theme.FrameVoid, 190));
 
+        var badges = DrawAudioBadges(renderer, clip, bounds);
         var name = source?.FileName ?? I18n.Timeline.MissingSource;
         renderer.DrawText(
-            renderer.Ellipsize(name, bounds.Width - 10, Theme.FontSizeLabel),
+            renderer.Ellipsize(name, Math.Max(0f, bounds.Width - 10 - badges), Theme.FontSizeLabel),
             bounds.Left + 5,
             bounds.Top + 2,
             Theme.FontSizeLabel,
@@ -387,6 +434,38 @@ public sealed class TimelinePanel : PanelBase
                 bounds.Height,
                 Theme.Accent);
         }
+    }
+
+    private static float DrawAudioBadges(Renderer renderer, Clip clip, FloatRect bounds)
+    {
+        var right = bounds.Left + bounds.Width - 3f;
+        var consumed = 0f;
+
+        if (clip.Audio.Muted)
+        {
+            var width = DrawBadge(renderer, I18n.Timeline.MutedBadge, right, bounds.Top + 2f, Theme.ClipMissingBorder);
+            right -= width + 3f;
+            consumed += width + 3f;
+        }
+
+        if (MathF.Abs(clip.Audio.Volume - 1f) > 0.005f)
+        {
+            var text = I18n.Timeline.VolumeBadge(clip.Audio.Volume);
+            consumed += DrawBadge(renderer, text, right, bounds.Top + 2f, Theme.Accent) + 3f;
+        }
+
+        return consumed;
+    }
+
+    private static float DrawBadge(Renderer renderer, string text, float right, float top, Color ink)
+    {
+        var width = MathF.Round(renderer.MeasureText(text, Theme.FontSizeLabel, TextFont.Mono)) + 6f;
+        var badge = new FloatRect(new Vector2f(right - width, top), new Vector2f(width, 13f));
+
+        renderer.FillRect(badge, Theme.WithAlpha(Theme.FrameVoid, 200));
+        renderer.DrawText(text, badge.Left + 3f, badge.Top, Theme.FontSizeLabel, ink, TextFont.Mono);
+
+        return width;
     }
 
     private void DrawFilmstrip(Renderer renderer, Clip clip, Domain.MediaSource source, FloatRect bounds)
@@ -455,13 +534,15 @@ public sealed class TimelinePanel : PanelBase
             new Vector2f(MathF.Round(left), row.Top + inset),
             new Vector2f(Math.Max(2f, MathF.Round(right - left)), row.Height - (inset * 2)));
 
-        if (_dragToTrack > 0)
+        var ink = _dragRejected ? Theme.ClipMissingBorder : Theme.Accent;
+
+        if (_dragToTrack > 0 || _dragRejected)
         {
-            renderer.FillRect(ghost, Theme.AccentSoft);
-            renderer.StrokeRect(ghost, Theme.Accent);
+            renderer.FillRect(ghost, _dragRejected ? Theme.WithAlpha(Theme.ClipMissing, 110) : Theme.AccentSoft);
+            renderer.StrokeRect(ghost, ink);
         }
 
-        renderer.FillRect(ghost.Left - 1, row.Top + 4, 2, row.Height - 8, Theme.Accent);
+        renderer.FillRect(ghost.Left - 1, row.Top + 4, 2, row.Height - 8, ink);
     }
 
     private void DrawPlayhead(Renderer renderer)
@@ -583,7 +664,12 @@ public sealed class TimelinePanel : PanelBase
     }
 
     private int TrackAt(Vector2f point) =>
-        LaneGeometry.TrackIndexAt(LaneBounds.Height, TrackCount, _laneScroll, point.Y - LaneBounds.Top);
+        LaneGeometry.TrackIndexAt(
+            LaneBounds.Height,
+            VideoTrackCount,
+            TrackCount,
+            _laneScroll,
+            point.Y - LaneBounds.Top);
 
     private ClipHit? ClipAt(Vector2f point)
     {
@@ -687,6 +773,7 @@ public sealed class TimelinePanel : PanelBase
         _dragToTrack = track;
         _dragFromIndex = index;
         _dragToIndex = index;
+        _dragRejected = false;
         _dragStart = _host.Timeline.StartOf(clip);
         _dragGrabOffset = XToTime(point.X) - _dragStart;
     }
@@ -746,6 +833,10 @@ public sealed class TimelinePanel : PanelBase
         _dragToTrack = track < 0 ? _dragFromTrack : track;
         _dragStart = LaneGeometry.DropStart(XToTime(point.X), _dragGrabOffset);
         _dragToIndex = IsReorderDrag ? TargetIndexFor(point) : -1;
+        _dragRejected = _dragClip is not null
+                        && !EditRules.CanPlaceOnTrack(
+                            _host.FindSource(_dragClip.SourceId),
+                            KindOf(_dragToTrack));
     }
 
     private void ApplyTrim(Vector2f point)
@@ -846,6 +937,7 @@ public sealed class TimelinePanel : PanelBase
         _dragToTrack = -1;
         _dragFromIndex = -1;
         _dragToIndex = -1;
+        _dragRejected = false;
     }
 
     private void CommitTrim()
@@ -869,7 +961,7 @@ public sealed class TimelinePanel : PanelBase
 
     private void CommitMove()
     {
-        if (_dragClip is null || _dragFromTrack < 0 || _dragToTrack < 0)
+        if (_dragClip is null || _dragFromTrack < 0 || _dragToTrack < 0 || _dragRejected)
         {
             return;
         }

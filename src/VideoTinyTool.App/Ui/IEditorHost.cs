@@ -39,7 +39,13 @@ public interface IEditorHost
 
     void AddTrack();
 
+    void AddAudioTrack();
+
     void RemoveTrack(int index);
+
+    void DetachAudio(Clip clip);
+
+    void ToggleClipMute(Clip clip);
 
     void MoveClipToTrack(Clip clip, int trackIndex, TimeSpan start);
 
