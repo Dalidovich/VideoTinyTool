@@ -88,6 +88,44 @@ public class PcmMixerTests
         Assert.Equal(0, destination[2]);
     }
 
+    [Fact]
+    public void ContributesNothingForAnInputMixedAtGainZero()
+    {
+        var destination = new byte[4];
+
+        PcmMixer.Mix(destination, [Input([500, -500], 0f), Input([300, -300], 1f)]);
+
+        Assert.Equal(new short[] { 300, -300 }, Samples(destination));
+    }
+
+    [Fact]
+    public void KeepsSilenceWhenEveryInputIsMixedAtGainZero()
+    {
+        var destination = new byte[4];
+        Array.Fill(destination, (byte)0x7F);
+
+        PcmMixer.Mix(destination, [Input([9000, -9000], 0f), Input([4000, -4000], 0f)]);
+
+        Assert.Equal(new short[] { 0, 0 }, Samples(destination));
+    }
+
+    [Fact]
+    public void MixesFourInputsAtDifferentGains()
+    {
+        var destination = new byte[4];
+
+        PcmMixer.Mix(
+            destination,
+            [
+                Input([1000, -800], 1f),
+                Input([1000, -800], 0.5f),
+                Input([1000, -800], 0.25f),
+                Input([1000, -800], 0f)
+            ]);
+
+        Assert.Equal(new short[] { 1750, -1400 }, Samples(destination));
+    }
+
     private static PcmMixInput Input(short[] samples, float gain)
     {
         var bytes = new byte[samples.Length * 2];

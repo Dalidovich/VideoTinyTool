@@ -21,7 +21,8 @@ public sealed class ClipPipeline : IDisposable
         TimeSpan sourceOffset,
         int previewWidth,
         int previewHeight,
-        bool withAudio)
+        bool withAudio,
+        bool withVideo = true)
     {
         Clip = clip;
         Source = source;
@@ -32,7 +33,7 @@ public sealed class ClipPipeline : IDisposable
         Height = previewHeight;
         _frameRate = Math.Clamp(source.FrameRate, 1, 120);
 
-        if (source.HasVideo)
+        if (withVideo && source.HasVideo)
         {
             _video = new VideoFramePipe(source.Path, sourceOffset, previewWidth, previewHeight, _frameRate);
         }

@@ -24,6 +24,7 @@ public sealed class PreviewPlayer : IDisposable
     private readonly PcmMixSource _mixer = new();
     private readonly List<(IPcmSource Source, float Gain)> _mixInputs = new();
     private readonly List<OverlayTrackState> _overlayTracks = new();
+    private readonly List<AudioTrackState> _audioTracks = new();
     private readonly List<OverlayFrame> _overlayFrames = new();
     private readonly int _previewWidth;
     private readonly int _previewHeight;
@@ -64,6 +65,7 @@ public sealed class PreviewPlayer : IDisposable
         _sound = new PcmSoundStream(_silentRing);
 
         SyncOverlayTracks();
+        SyncAudioTracks();
     }
 
     public bool IsPlaying { get; private set; }
@@ -195,6 +197,7 @@ public sealed class PreviewPlayer : IDisposable
 
         Stop(keepPosition: false);
         SyncOverlayTracks();
+        SyncAudioTracks();
         _pausedPosition = position;
 
         if (_timeline.Clips.Count == 0)
@@ -243,6 +246,7 @@ public sealed class PreviewPlayer : IDisposable
         }
 
         UpdateOverlays(position);
+        UpdateAudioTracks(position);
 
         if (_inGap)
         {
@@ -327,7 +331,7 @@ public sealed class PreviewPlayer : IDisposable
     {
         DisposeBasePipelines();
 
-        if (HasOverlayAudio)
+        if (HasTrackAudio)
         {
             RefreshAudioMix();
         }
@@ -458,6 +462,29 @@ public sealed class PreviewPlayer : IDisposable
         }
     }
 
+    private void SyncAudioTracks()
+    {
+        var first = _timeline.FirstAudioTrackIndex;
+        var wanted = _timeline.AudioTrackCount;
+
+        while (_audioTracks.Count > wanted)
+        {
+            var last = _audioTracks[^1];
+            _audioTracks.RemoveAt(_audioTracks.Count - 1);
+            last.Dispose();
+        }
+
+        while (_audioTracks.Count < wanted)
+        {
+            _audioTracks.Add(new AudioTrackState());
+        }
+
+        for (var i = 0; i < _audioTracks.Count; i++)
+        {
+            _audioTracks[i].TrackIndex = first + i;
+        }
+    }
+
     private void UpdateOverlays(TimeSpan position)
     {
         if (_overlayTracks.Count == 0)
@@ -568,6 +595,121 @@ public sealed class PreviewPlayer : IDisposable
         track.Next?.Start();
     }
 
+    private void UpdateAudioTracks(TimeSpan position)
+    {
+        if (_audioTracks.Count == 0)
+        {
+            return;
+        }
+
+        var withAudio = IsNormalRate(_rate);
+        var rewired = false;
+
+        foreach (var track in _audioTracks)
+        {
+            rewired |= SyncAudioPipeline(track, position, withAudio);
+            PrefetchAudio(track, position, withAudio);
+        }
+
+        if (rewired)
+        {
+            RefreshAudioMix();
+        }
+    }
+
+    private bool SyncAudioPipeline(AudioTrackState track, TimeSpan position, bool withAudio)
+    {
+        var location = _timeline.Resolve(track.TrackIndex, position);
+
+        if (location is null)
+        {
+            if (track.Current is null)
+            {
+                return false;
+            }
+
+            track.Current.Dispose();
+            track.Current = null;
+            return true;
+        }
+
+        var clip = location.Value.Clip;
+
+        if (track.Current is not null && ReferenceEquals(track.Current.Clip, clip))
+        {
+            return false;
+        }
+
+        if (track.Next is not null && ReferenceEquals(track.Next.Clip, clip))
+        {
+            track.Current?.Dispose();
+            track.Current = track.Next;
+            track.Next = null;
+            return true;
+        }
+
+        track.Next?.Dispose();
+        track.Next = null;
+        track.Current?.Dispose();
+        track.Current = CreateAudioPipeline(clip, location.Value.Index, position, location.Value.SourceOffset, withAudio);
+        track.Current?.Start();
+        return true;
+    }
+
+    private void PrefetchAudio(AudioTrackState track, TimeSpan position, bool withAudio)
+    {
+        var pipeline = track.Current;
+        if (pipeline is null || track.Next is not null)
+        {
+            return;
+        }
+
+        if (position < pipeline.GlobalEnd - PrefetchLead)
+        {
+            return;
+        }
+
+        if (_timeline.NextClipStart(track.TrackIndex, pipeline.GlobalEnd) > pipeline.GlobalEnd)
+        {
+            return;
+        }
+
+        var clips = _timeline.ClipsOf(track.TrackIndex);
+        var index = pipeline.ClipIndex + 1;
+        if (index >= clips.Count)
+        {
+            return;
+        }
+
+        track.Next = CreateAudioPipeline(clips[index], index, pipeline.GlobalEnd, clips[index].In, withAudio);
+        track.Next?.Start();
+    }
+
+    private ClipPipeline? CreateAudioPipeline(
+        Clip clip,
+        int clipIndex,
+        TimeSpan globalStart,
+        TimeSpan sourceOffset,
+        bool withAudio)
+    {
+        var source = _sourceLookup(clip.SourceId);
+        if (source is null)
+        {
+            return null;
+        }
+
+        return new ClipPipeline(
+            clip,
+            source,
+            clipIndex,
+            globalStart,
+            sourceOffset,
+            _previewWidth,
+            _previewHeight,
+            withAudio,
+            withVideo: false);
+    }
+
     private ClipPipeline? CreateOverlayPipeline(
         Clip clip,
         int clipIndex,
@@ -613,11 +755,19 @@ public sealed class PreviewPlayer : IDisposable
 
     private static int Even(int value) => value < 2 ? 2 : value % 2 == 0 ? value : value + 1;
 
-    private bool HasOverlayAudio
+    private bool HasTrackAudio
     {
         get
         {
             foreach (var track in _overlayTracks)
+            {
+                if (track.Current?.Ring is not null)
+                {
+                    return true;
+                }
+            }
+
+            foreach (var track in _audioTracks)
             {
                 if (track.Current?.Ring is not null)
                 {
@@ -633,7 +783,20 @@ public sealed class PreviewPlayer : IDisposable
     {
         _mixInputs.Clear();
 
+        if (_current is { Ring: { } baseRing } basePipeline)
+        {
+            _mixInputs.Add((baseRing, basePipeline.Clip.Audio.Gain));
+        }
+
         foreach (var track in _overlayTracks)
+        {
+            if (track.Current is { Ring: { } ring } pipeline)
+            {
+                _mixInputs.Add((ring, pipeline.Clip.Audio.Gain));
+            }
+        }
+
+        foreach (var track in _audioTracks)
         {
             if (track.Current is { Ring: { } ring } pipeline)
             {
@@ -643,17 +806,19 @@ public sealed class PreviewPlayer : IDisposable
 
         if (_mixInputs.Count == 0)
         {
-            _sound.Source = _current?.Ring ?? _silentRing;
+            _sound.Source = _silentRing;
             return;
         }
 
-        if (_current?.Ring is { } baseRing)
+        if (_mixInputs.Count == 1 && _mixInputs[0].Gain >= 1f)
         {
-            _mixInputs.Insert(0, (baseRing, 1f));
+            _sound.Source = _mixInputs[0].Source;
         }
-
-        _mixer.SetInputs(_mixInputs);
-        _sound.Source = _mixer;
+        else
+        {
+            _mixer.SetInputs(_mixInputs);
+            _sound.Source = _mixer;
+        }
 
         if (IsPlaying && IsNormalRate(_rate) && _sound.Status != SoundStatus.Playing)
         {
@@ -696,6 +861,11 @@ public sealed class PreviewPlayer : IDisposable
         DisposeBasePipelines();
 
         foreach (var track in _overlayTracks)
+        {
+            track.DisposePipelines();
+        }
+
+        foreach (var track in _audioTracks)
         {
             track.DisposePipelines();
         }
@@ -879,6 +1049,32 @@ public sealed class PreviewPlayer : IDisposable
         }
 
         _overlayTracks.Clear();
+
+        foreach (var track in _audioTracks)
+        {
+            track.Dispose();
+        }
+
+        _audioTracks.Clear();
+    }
+
+    private sealed class AudioTrackState : IDisposable
+    {
+        public int TrackIndex { get; set; }
+
+        public ClipPipeline? Current { get; set; }
+
+        public ClipPipeline? Next { get; set; }
+
+        public void DisposePipelines()
+        {
+            Current?.Dispose();
+            Current = null;
+            Next?.Dispose();
+            Next = null;
+        }
+
+        public void Dispose() => DisposePipelines();
     }
 
     private sealed class OverlayTrackState : IDisposable
