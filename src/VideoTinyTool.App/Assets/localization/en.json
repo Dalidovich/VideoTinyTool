@@ -65,6 +65,7 @@
     "zoom": "Zoom the timeline in / out",
     "zoomAtCursor": "Zoom around the cursor",
     "scrollTimeline": "Scroll the timeline",
+    "snap": "Snap to clip edges and the playhead",
     "showHelp": "Open this list",
     "contextMenu": "Open the context menu",
     "addTrack": "Add a video track",

@@ -96,6 +96,7 @@ public static class I18n
         public static string Zoom => _catalog.Text("help.zoom");
         public static string ZoomAtCursor => _catalog.Text("help.zoomAtCursor");
         public static string ScrollTimeline => _catalog.Text("help.scrollTimeline");
+        public static string Snap => _catalog.Text("help.snap");
         public static string ShowHelp => _catalog.Text("help.showHelp");
         public static string ContextMenu => _catalog.Text("help.contextMenu");
         public static string AddTrack => _catalog.Text("help.addTrack");

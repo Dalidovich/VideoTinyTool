@@ -141,6 +141,45 @@ public sealed class TimelinePanel : PanelBase
     private TimeSpan XToTime(float x) =>
         TimeSpan.FromSeconds(_scrollSeconds + ((x - LaneBounds.Left) / _pixelsPerSecond));
 
+    private static bool SnapHeld =>
+        Keyboard.IsKeyPressed(Keyboard.Key.LControl) || Keyboard.IsKeyPressed(Keyboard.Key.RControl);
+
+    private List<TimeSpan> SnapPoints(Clip? exclude, bool includePlayhead)
+    {
+        var points = new List<TimeSpan> { TimeSpan.Zero };
+
+        for (var track = 0; track < TrackCount; track++)
+        {
+            var start = TimeSpan.Zero;
+
+            foreach (var clip in _host.Timeline.ClipsOf(track))
+            {
+                start += clip.LeadingGap;
+
+                if (!ReferenceEquals(clip, exclude))
+                {
+                    points.Add(start);
+                    points.Add(start + clip.Duration);
+                }
+
+                start += clip.Duration;
+            }
+        }
+
+        if (includePlayhead)
+        {
+            points.Add(_host.Player.Position);
+        }
+
+        return points;
+    }
+
+    private TimeSpan PointerTime(float x, Clip? exclude, bool includePlayhead)
+    {
+        var time = XToTime(x);
+        return SnapHeld ? SnapGeometry.Snap(time, SnapPoints(exclude, includePlayhead), _pixelsPerSecond) : time;
+    }
+
     private FloatRect LaneRect(int trackIndex)
     {
         var lane = LaneBounds;
@@ -955,8 +994,11 @@ public sealed class TimelinePanel : PanelBase
     {
         _drag = DragMode.Playhead;
         _wasPlayingBeforeDrag = _host.Player.IsPlaying;
-        _host.SeekTo(ClampToTimeline(XToTime(point.X)), true);
+        SeekToPointer(point);
     }
+
+    private void SeekToPointer(Vector2f point) =>
+        _host.SeekTo(ClampToTimeline(PointerTime(point.X, null, false)), true);
 
     private void StartTrim(Clip clip, DragMode mode)
     {
@@ -986,7 +1028,7 @@ public sealed class TimelinePanel : PanelBase
         switch (_drag)
         {
             case DragMode.Playhead:
-                _host.SeekTo(ClampToTimeline(XToTime(point.X)), true);
+                SeekToPointer(point);
                 break;
 
             case DragMode.TrimIn:
@@ -1004,12 +1046,28 @@ public sealed class TimelinePanel : PanelBase
     {
         var track = TrackAt(point);
         _dragToTrack = track < 0 ? _dragFromTrack : track;
-        _dragStart = LaneGeometry.DropStart(XToTime(point.X), _dragGrabOffset);
+        _dragStart = DropStartFor(point);
         _dragToIndex = IsReorderDrag ? TargetIndexFor(point) : -1;
         _dragRejected = _dragClip is not null
                         && !EditRules.CanPlaceOnTrack(
                             _host.FindSource(_dragClip.SourceId),
                             KindOf(_dragToTrack));
+    }
+
+    private TimeSpan DropStartFor(Vector2f point)
+    {
+        var start = LaneGeometry.DropStart(XToTime(point.X), _dragGrabOffset);
+
+        if (!SnapHeld || _dragClip is null)
+        {
+            return start;
+        }
+
+        return SnapGeometry.SnapSpan(
+            start,
+            _dragClip.Duration,
+            SnapPoints(_dragClip, true),
+            _pixelsPerSecond);
     }
 
     private void ApplyTrim(Vector2f point)
@@ -1022,7 +1080,7 @@ public sealed class TimelinePanel : PanelBase
         var source = _host.FindSource(_dragClip.SourceId);
         var minimum = EditRules.MinimumDuration(source);
         var clipStart = _host.Timeline.StartOf(_dragClip);
-        var pointer = XToTime(point.X);
+        var pointer = PointerTime(point.X, _dragClip, true);
 
         if (_drag == DragMode.TrimIn)
         {

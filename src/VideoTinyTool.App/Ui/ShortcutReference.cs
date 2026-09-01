@@ -23,6 +23,7 @@ public static class ShortcutReference
             new ShortcutEntry("+ / -", I18n.Help.Zoom),
             new ShortcutEntry("Ctrl+Wheel", I18n.Help.ZoomAtCursor),
             new ShortcutEntry("Wheel", I18n.Help.ScrollTimeline),
+            new ShortcutEntry("Ctrl + drag", I18n.Help.Snap),
             new ShortcutEntry("F1", I18n.Help.ShowHelp),
             new ShortcutEntry("Right click", I18n.Help.ContextMenu)
         ]),
