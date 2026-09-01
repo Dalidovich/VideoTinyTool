@@ -1,4 +1,4 @@
-﻿using SFML.Graphics;
+using SFML.Graphics;
 using SFML.System;
 using SFML.Window;
 using VideoTinyTool.Domain;
@@ -32,6 +32,8 @@ public sealed class PreviewPanel : PanelBase
     private OverlayHandle _handle;
     private OverlayTransform _gestureStart;
     private OverlayTransform _gestureTransform;
+    private Clip? _audioClip;
+    private ClipAudio _audioValue;
     private Vector2f _gestureOrigin;
     private double _gestureAspect = 16.0 / 9.0;
 
@@ -49,8 +51,8 @@ public sealed class PreviewPanel : PanelBase
 
         _opacity.ValueChanged += value => EditOverlay(transform => transform with { Opacity = value });
         _opacity.DragFinished += CommitOverlay;
-        _volume.ValueChanged += value => EditOverlay(transform => transform with { Volume = value });
-        _volume.DragFinished += CommitOverlay;
+        _volume.ValueChanged += value => EditAudio(audio => audio with { Volume = value });
+        _volume.DragFinished += CommitAudio;
         _resetOverlay.Clicked += ResetOverlay;
     }
 
@@ -85,7 +87,11 @@ public sealed class PreviewPanel : PanelBase
     }
 
     private Clip? OverlayClip =>
-        _host.SelectedClip is { } clip && _host.SelectedTrackIndex > 0 ? clip : null;
+        _host.SelectedClip is { } clip
+        && _host.SelectedTrackIndex > 0
+        && !_host.Timeline.IsAudioTrack(_host.SelectedTrackIndex)
+            ? clip
+            : null;
 
     public void Layout(Renderer renderer)
     {
@@ -310,13 +316,15 @@ public sealed class PreviewPanel : PanelBase
             _opacity.Value = transform.Opacity;
         }
 
+        var audio = CurrentAudio(clip);
+
         if (!_volume.Dragging)
         {
-            _volume.Value = transform.Volume;
+            _volume.Value = audio.Volume;
         }
 
         DrawSliderGroup(renderer, bar, I18n.Preview.OverlayOpacity, _opacity, transform.Opacity);
-        DrawSliderGroup(renderer, bar, I18n.Preview.OverlayVolume, _volume, transform.Volume);
+        DrawSliderGroup(renderer, bar, I18n.Preview.OverlayVolume, _volume, audio.Volume);
 
         _resetOverlay.Draw(renderer);
     }
@@ -402,6 +410,9 @@ public sealed class PreviewPanel : PanelBase
     private OverlayTransform CurrentTransform(Clip clip) =>
         ReferenceEquals(_gestureClip, clip) ? _gestureTransform : clip.Overlay;
 
+    private ClipAudio CurrentAudio(Clip clip) =>
+        ReferenceEquals(_audioClip, clip) ? _audioValue : clip.Audio;
+
     private OverlayTransform LiveTransform(int trackIndex, OverlayTransform fallback) =>
         _gestureClip is { } clip && _host.Timeline.TrackIndexOf(clip) == trackIndex
             ? _gestureTransform
@@ -423,6 +434,37 @@ public sealed class PreviewPanel : PanelBase
         }
 
         _gestureTransform = change(_gestureTransform).Clamped();
+    }
+
+    private void EditAudio(Func<ClipAudio, ClipAudio> change)
+    {
+        if (_audioClip is null)
+        {
+            if (OverlayClip is not { } clip)
+            {
+                return;
+            }
+
+            _audioClip = clip;
+            _audioValue = clip.Audio;
+        }
+
+        _audioValue = change(_audioValue).Clamped();
+    }
+
+    private void CommitAudio()
+    {
+        var clip = _audioClip;
+        var audio = _audioValue;
+
+        _audioClip = null;
+
+        if (clip is null || audio == clip.Audio)
+        {
+            return;
+        }
+
+        _host.SetClipAudio(clip, audio);
     }
 
     private void CommitOverlay()

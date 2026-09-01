@@ -2,7 +2,8 @@ namespace VideoTinyTool.Domain;
 
 public sealed class Timeline
 {
-    public const int MaxTracks = 4;
+    public const int MaxVideoTracks = 4;
+    public const int MaxAudioTracks = 4;
 
     private readonly List<Track> _tracks = new();
 
@@ -37,6 +38,26 @@ public sealed class Timeline
             return total;
         }
     }
+
+    public int VideoTrackCount
+    {
+        get
+        {
+            var count = 0;
+            while (count < _tracks.Count && !_tracks[count].IsAudio)
+            {
+                count++;
+            }
+
+            return count;
+        }
+    }
+
+    public int AudioTrackCount => _tracks.Count - VideoTrackCount;
+
+    public int FirstAudioTrackIndex => VideoTrackCount;
+
+    public bool IsAudioTrack(int index) => index >= 0 && index < _tracks.Count && _tracks[index].IsAudio;
 
     public IReadOnlyList<Clip> ClipsOf(int trackIndex) => _tracks[trackIndex].Clips;
 
@@ -79,15 +100,32 @@ public sealed class Timeline
         return -1;
     }
 
-    public Track? AddTrack()
+    public Track? AddTrack() => AddTrack(TrackKind.Video);
+
+    public Track? AddTrack(TrackKind kind)
     {
-        var track = new Track();
-        return InsertTrack(_tracks.Count, track) ? track : null;
+        var track = new Track(kind);
+        var index = kind == TrackKind.Audio ? _tracks.Count : VideoTrackCount;
+        return InsertTrack(index, track) ? track : null;
     }
 
     public bool InsertTrack(int index, Track track)
     {
-        if (_tracks.Count >= MaxTracks || index <= 0 || index > _tracks.Count)
+        if (index <= 0 || index > _tracks.Count)
+        {
+            return false;
+        }
+
+        var videoCount = VideoTrackCount;
+
+        if (track.IsAudio)
+        {
+            if (AudioTrackCount >= MaxAudioTracks || index < videoCount)
+            {
+                return false;
+            }
+        }
+        else if (videoCount >= MaxVideoTracks || index > videoCount)
         {
             return false;
         }
@@ -160,6 +198,12 @@ public sealed class Timeline
     public void SetOverlay(Clip clip, OverlayTransform transform)
     {
         clip.Overlay = transform.Clamped();
+        Changed?.Invoke();
+    }
+
+    public void SetClipAudio(Clip clip, ClipAudio audio)
+    {
+        clip.Audio = audio.Clamped();
         Changed?.Invoke();
     }
 

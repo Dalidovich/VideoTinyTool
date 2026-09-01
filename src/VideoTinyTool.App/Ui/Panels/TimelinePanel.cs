@@ -16,6 +16,7 @@ public sealed class TimelinePanel : PanelBase
     private const float ClipPadding = 8f;
     private const float TrackButtonSize = 15f;
     private const float LaneWheelStep = 24f;
+    private const int MaxTracks = Domain.Timeline.MaxVideoTracks + Domain.Timeline.MaxAudioTracks;
 
     private static readonly double[] TickSteps =
     [
@@ -61,7 +62,7 @@ public sealed class TimelinePanel : PanelBase
 
         _addTrack.Clicked += _host.AddTrack;
 
-        for (var track = 1; track < Domain.Timeline.MaxTracks; track++)
+        for (var track = 1; track < MaxTracks; track++)
         {
             var index = track;
             var button = new Button(I18n.Timeline.RemoveTrack, ButtonStyle.Ghost);
@@ -148,7 +149,7 @@ public sealed class TimelinePanel : PanelBase
     {
         _laneScroll = LaneGeometry.ClampScroll(_laneScroll, LaneBounds.Height, TrackCount);
 
-        for (var track = 1; track < Domain.Timeline.MaxTracks; track++)
+        for (var track = 1; track < MaxTracks; track++)
         {
             var button = _removeTrack[track - 1];
             var cell = HeaderCell(track);
@@ -161,7 +162,7 @@ public sealed class TimelinePanel : PanelBase
         }
 
         var baseCell = HeaderCell(0);
-        _addTrack.Enabled = TrackCount < Domain.Timeline.MaxTracks;
+        _addTrack.Enabled = _host.Timeline.VideoTrackCount < Domain.Timeline.MaxVideoTracks;
         _addTrack.Bounds = Reachable(new FloatRect(
             new Vector2f(baseCell.Left + 6f, baseCell.Top + baseCell.Height - TrackButtonSize - 6f),
             new Vector2f(baseCell.Width - 12f, TrackButtonSize)));
@@ -250,7 +251,7 @@ public sealed class TimelinePanel : PanelBase
             foreach (var clip in _host.Timeline.ClipsOf(track))
             {
                 start += clip.LeadingGap;
-                DrawClip(renderer, clip, start, row, track > 0);
+                DrawClip(renderer, clip, start, row, track > 0 && !_host.Timeline.IsAudioTrack(track));
                 start += clip.Duration;
             }
         }

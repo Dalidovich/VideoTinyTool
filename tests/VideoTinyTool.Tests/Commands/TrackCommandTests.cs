@@ -30,21 +30,61 @@ public class TrackCommandTests
     }
 
     [Fact]
-    public void AddTrackCommand_IsANoOpAtMaxTracks()
+    public void AddTrackCommand_IsANoOpAtMaxVideoTracks()
     {
         var timeline = new Timeline();
         var history = new CommandHistory(timeline);
 
-        for (var i = 1; i < Timeline.MaxTracks; i++)
+        for (var i = 1; i < Timeline.MaxVideoTracks; i++)
         {
             history.Execute(new AddTrackCommand());
         }
 
         history.Execute(new AddTrackCommand());
-        Assert.Equal(Timeline.MaxTracks, timeline.Tracks.Count);
+        Assert.Equal(Timeline.MaxVideoTracks, timeline.Tracks.Count);
 
         history.Undo();
-        Assert.Equal(Timeline.MaxTracks, timeline.Tracks.Count);
+        Assert.Equal(Timeline.MaxVideoTracks, timeline.Tracks.Count);
+    }
+
+    [Fact]
+    public void AddTrackCommand_RoundTripsAnAudioTrackAfterTheVideoTracks()
+    {
+        var timeline = new Timeline();
+        var history = new CommandHistory(timeline);
+        var audio = new AddTrackCommand(TrackKind.Audio);
+
+        history.Execute(audio);
+        history.Execute(new AddTrackCommand());
+
+        Assert.Equal(2, timeline.VideoTrackCount);
+        Assert.Same(audio.Track, timeline.Tracks[2]);
+
+        history.Undo();
+        history.Undo();
+        Assert.Single(timeline.Tracks);
+
+        history.Redo();
+        history.Redo();
+        Assert.Equal(2, timeline.VideoTrackCount);
+        Assert.Same(audio.Track, timeline.Tracks[2]);
+    }
+
+    [Fact]
+    public void RemoveTrackCommand_RestoresTheAudioTrackIndexAndKind()
+    {
+        var timeline = new Timeline();
+        var history = new CommandHistory(timeline);
+        timeline.AddTrack();
+        var audio = timeline.AddTrack(TrackKind.Audio)!;
+
+        history.Execute(new RemoveTrackCommand(2));
+        Assert.Equal(0, timeline.AudioTrackCount);
+
+        history.Undo();
+        Assert.Same(audio, timeline.Tracks[2]);
+        Assert.Equal(TrackKind.Audio, timeline.Tracks[2].Kind);
+        Assert.Equal(2, timeline.VideoTrackCount);
     }
 
     [Fact]
@@ -89,7 +129,7 @@ public class TrackCommandTests
     {
         var (timeline, _, a, _, _) = TestData.ThreeClipTimeline();
         var history = new CommandHistory(timeline);
-        var target = new OverlayTransform(0.1f, 0.2f, 0.3f, 0.4f, 0.5f);
+        var target = new OverlayTransform(0.1f, 0.2f, 0.3f, 0.4f);
 
         history.Execute(new SetOverlayTransformCommand(a, target));
         Assert.Equal(target, a.Overlay);

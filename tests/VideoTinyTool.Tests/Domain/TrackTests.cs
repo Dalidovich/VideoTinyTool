@@ -15,17 +15,96 @@ public class TrackTests
     }
 
     [Fact]
-    public void AddTrack_StopsAtMaxTracks()
+    public void AddTrack_StopsAtMaxVideoTracks()
     {
         var timeline = new Timeline();
 
-        for (var i = 1; i < Timeline.MaxTracks; i++)
+        for (var i = 1; i < Timeline.MaxVideoTracks; i++)
         {
             Assert.NotNull(timeline.AddTrack());
         }
 
         Assert.Null(timeline.AddTrack());
-        Assert.Equal(Timeline.MaxTracks, timeline.Tracks.Count);
+        Assert.Equal(Timeline.MaxVideoTracks, timeline.Tracks.Count);
+    }
+
+    [Fact]
+    public void AudioTracks_AreAppendedAfterEveryVideoTrack()
+    {
+        var timeline = new Timeline();
+        var audio = timeline.AddTrack(TrackKind.Audio)!;
+
+        Assert.Equal(1, timeline.IndexOfTrack(audio));
+        Assert.Equal(1, timeline.VideoTrackCount);
+        Assert.Equal(1, timeline.AudioTrackCount);
+        Assert.Equal(1, timeline.FirstAudioTrackIndex);
+        Assert.True(timeline.IsAudioTrack(1));
+        Assert.False(timeline.IsAudioTrack(0));
+
+        var video = timeline.AddTrack()!;
+
+        Assert.Equal(1, timeline.IndexOfTrack(video));
+        Assert.Equal(2, timeline.IndexOfTrack(audio));
+        Assert.Equal(2, timeline.VideoTrackCount);
+        Assert.Equal(2, timeline.FirstAudioTrackIndex);
+    }
+
+    [Fact]
+    public void FirstAudioTrackIndex_IsTheTrackCountWithoutAudioTracks()
+    {
+        var timeline = new Timeline();
+        timeline.AddTrack();
+
+        Assert.Equal(0, timeline.AudioTrackCount);
+        Assert.Equal(timeline.Tracks.Count, timeline.FirstAudioTrackIndex);
+    }
+
+    [Fact]
+    public void PerKindCaps_RefuseIndependently()
+    {
+        var timeline = new Timeline();
+
+        for (var i = 1; i < Timeline.MaxVideoTracks; i++)
+        {
+            Assert.NotNull(timeline.AddTrack());
+        }
+
+        for (var i = 0; i < Timeline.MaxAudioTracks; i++)
+        {
+            Assert.NotNull(timeline.AddTrack(TrackKind.Audio));
+        }
+
+        Assert.Null(timeline.AddTrack());
+        Assert.Null(timeline.AddTrack(TrackKind.Audio));
+        Assert.Equal(Timeline.MaxVideoTracks, timeline.VideoTrackCount);
+        Assert.Equal(Timeline.MaxAudioTracks, timeline.AudioTrackCount);
+    }
+
+    [Fact]
+    public void InsertTrack_RefusesAKindLandingInTheWrongRange()
+    {
+        var timeline = new Timeline();
+        timeline.AddTrack();
+        timeline.AddTrack(TrackKind.Audio);
+
+        Assert.False(timeline.InsertTrack(3, new Track()));
+        Assert.False(timeline.InsertTrack(1, new Track(TrackKind.Audio)));
+        Assert.Equal(3, timeline.Tracks.Count);
+
+        Assert.True(timeline.InsertTrack(2, new Track()));
+        Assert.True(timeline.InsertTrack(4, new Track(TrackKind.Audio)));
+        Assert.Equal(3, timeline.VideoTrackCount);
+        Assert.Equal(2, timeline.AudioTrackCount);
+    }
+
+    [Fact]
+    public void TotalDuration_IsTheLongestTrackWhenItIsAudio()
+    {
+        var (timeline, sourceId, _, _, _) = TestData.ThreeClipTimeline();
+        timeline.AddTrack(TrackKind.Audio);
+        timeline.Add(1, TestData.Clip(sourceId, 0, 30));
+
+        Assert.Equal(TimeSpan.FromSeconds(30), timeline.TotalDuration);
     }
 
     [Fact]

@@ -20,11 +20,12 @@ public readonly record struct OverlayItem(
     TimeSpan Out,
     bool HasAudio,
     TimeSpan Start,
-    OverlayTransform Transform)
+    OverlayTransform Transform,
+    ClipAudio Audio)
 {
     public TimeSpan Duration => Out - In;
 
-    public bool HasSound => HasAudio && Transform.Volume > 0f;
+    public bool HasSound => HasAudio && Audio.Gain > 0f;
 }
 
 public static class FFmpegArgumentBuilder
@@ -59,7 +60,7 @@ public static class FFmpegArgumentBuilder
     {
         var items = new List<OverlayItem>();
 
-        for (var trackIndex = 1; trackIndex < timeline.Tracks.Count; trackIndex++)
+        for (var trackIndex = 1; trackIndex < timeline.VideoTrackCount; trackIndex++)
         {
             var start = TimeSpan.Zero;
             foreach (var clip in timeline.Tracks[trackIndex].Clips)
@@ -68,7 +69,14 @@ public static class FFmpegArgumentBuilder
 
                 if (sources.TryGetValue(clip.SourceId, out var source))
                 {
-                    items.Add(new OverlayItem(source.Path, clip.In, clip.Out, source.HasAudio, start, clip.Overlay));
+                    items.Add(new OverlayItem(
+                        source.Path,
+                        clip.In,
+                        clip.Out,
+                        source.HasAudio,
+                        start,
+                        clip.Overlay,
+                        clip.Audio));
                 }
 
                 start += clip.Duration;
@@ -257,7 +265,7 @@ public static class FFmpegArgumentBuilder
 
             graph.Append(";[").Append(input + k).Append(":a]");
             graph.Append("aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,");
-            graph.Append("volume=").Append(Number(overlays[k].Transform.Volume)).Append(',');
+            graph.Append("volume=").Append(Number(overlays[k].Audio.Gain)).Append(',');
             graph.Append("adelay=").Append(delay).Append('|').Append(delay);
             graph.Append("[oa").Append(k).Append(']');
 

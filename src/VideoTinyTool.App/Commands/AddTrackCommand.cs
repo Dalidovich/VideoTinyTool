@@ -4,8 +4,19 @@ namespace VideoTinyTool.Commands;
 
 public sealed class AddTrackCommand : IEditCommand
 {
+    private readonly TrackKind _kind;
     private Track? _track;
     private int _index = -1;
+
+    public AddTrackCommand()
+        : this(TrackKind.Video)
+    {
+    }
+
+    public AddTrackCommand(TrackKind kind)
+    {
+        _kind = kind;
+    }
 
     public string Name => "Add track";
 
@@ -13,15 +24,10 @@ public sealed class AddTrackCommand : IEditCommand
 
     public void Execute(Timeline timeline)
     {
-        _track ??= new Track();
+        _track ??= new Track(_kind);
 
-        if (!timeline.InsertTrack(timeline.Tracks.Count, _track))
-        {
-            _index = -1;
-            return;
-        }
-
-        _index = timeline.IndexOfTrack(_track);
+        var index = _kind == TrackKind.Audio ? timeline.Tracks.Count : timeline.VideoTrackCount;
+        _index = timeline.InsertTrack(index, _track) ? timeline.IndexOfTrack(_track) : -1;
     }
 
     public void Undo(Timeline timeline)

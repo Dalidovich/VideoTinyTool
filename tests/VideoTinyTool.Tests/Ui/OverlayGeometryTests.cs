@@ -8,7 +8,7 @@ public class OverlayGeometryTests
     private const float VideoWidth = 800f;
     private const float VideoHeight = 450f;
 
-    private static readonly OverlayTransform Quarter = new(0.25f, 0.2f, 0.25f, 1f, 1f);
+    private static readonly OverlayTransform Quarter = new(0.25f, 0.2f, 0.25f, 1f);
 
     [Fact]
     public void ProjectScalesTheTransformIntoVideoPixels()
@@ -125,13 +125,12 @@ public class OverlayGeometryTests
     }
 
     [Fact]
-    public void ResizeLeavesOpacityAndVolumeAlone()
+    public void ResizeLeavesOpacityAlone()
     {
-        var start = new OverlayTransform(0.25f, 0.2f, 0.25f, 0.4f, 0.7f);
+        var start = new OverlayTransform(0.25f, 0.2f, 0.25f, 0.4f);
         var resized = OverlayGeometry.Resize(start, OverlayHandle.TopRight, VideoWidth, VideoHeight, 2.0, 40f, -20f);
 
         Assert.Equal(start.Opacity, resized.Opacity);
-        Assert.Equal(start.Volume, resized.Volume);
     }
 
     [Fact]

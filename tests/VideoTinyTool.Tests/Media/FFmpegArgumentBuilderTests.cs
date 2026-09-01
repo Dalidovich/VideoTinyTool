@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using VideoTinyTool.Application;
 using VideoTinyTool.Domain;
 using VideoTinyTool.Media;
@@ -30,14 +30,16 @@ public class FFmpegArgumentBuilderTests
         double outSeconds,
         double startSeconds,
         OverlayTransform transform,
-        bool hasAudio = false) =>
+        bool hasAudio = false,
+        float volume = 1f) =>
         new(
             path,
             TimeSpan.FromSeconds(inSeconds),
             TimeSpan.FromSeconds(outSeconds),
             hasAudio,
             TimeSpan.FromSeconds(startSeconds),
-            transform);
+            transform,
+            new ClipAudio(volume, false));
 
     [Fact]
     public void SingleClip_PutsSeekAndDurationBeforeTheInput()
@@ -271,8 +273,8 @@ public class FFmpegArgumentBuilderTests
         var graph = FFmpegArgumentBuilder.BuildFilterGraph(
             [Item(@"C:\media\a.mp4", 0, 10)],
             [
-                Overlay(@"C:\media\one.mp4", 0, 3, 0, new OverlayTransform(0f, 0f, 0.25f, 1f, 0f)),
-                Overlay(@"C:\media\two.mp4", 0, 3, 4, new OverlayTransform(0.5f, 0.5f, 0.5f, 0.5f, 0f))
+                Overlay(@"C:\media\one.mp4", 0, 3, 0, new OverlayTransform(0f, 0f, 0.25f, 1f)),
+                Overlay(@"C:\media\two.mp4", 0, 3, 4, new OverlayTransform(0.5f, 0.5f, 0.5f, 0.5f))
             ],
             Settings());
 
@@ -291,7 +293,7 @@ public class FFmpegArgumentBuilderTests
     {
         var overlays = new[]
         {
-            Overlay(@"C:\media\pip.mp4", 0, 3, 1.25, new OverlayTransform(0f, 0f, 0.25f, 1f, 0.5f), hasAudio: true)
+            Overlay(@"C:\media\pip.mp4", 0, 3, 1.25, new OverlayTransform(0f, 0f, 0.25f, 1f), hasAudio: true, volume: 0.5f)
         };
 
         var graph = FFmpegArgumentBuilder.BuildFilterGraph([Item(@"C:\media\a.mp4", 0, 10)], overlays, Settings());
@@ -326,7 +328,7 @@ public class FFmpegArgumentBuilderTests
     {
         var overlays = new[]
         {
-            Overlay(@"C:\media\pip.mp4", 0, 3, 1, new OverlayTransform(0f, 0f, 0.25f, 1f, 0f), hasAudio: true)
+            Overlay(@"C:\media\pip.mp4", 0, 3, 1, new OverlayTransform(0f, 0f, 0.25f, 1f), hasAudio: true, volume: 0f)
         };
 
         var graph = FFmpegArgumentBuilder.BuildFilterGraph([Item(@"C:\media\a.mp4", 0, 10)], overlays, Settings());
@@ -360,7 +362,7 @@ public class FFmpegArgumentBuilderTests
         {
             var graph = FFmpegArgumentBuilder.BuildFilterGraph(
                 [Item(@"C:\media\a.mp4", 0, 10)],
-                [Overlay(@"C:\media\pip.mp4", 0, 3, 1.5, new OverlayTransform(0f, 0f, 0.25f, 0.5f, 0.25f), hasAudio: true)],
+                [Overlay(@"C:\media\pip.mp4", 0, 3, 1.5, new OverlayTransform(0f, 0f, 0.25f, 0.5f), hasAudio: true, volume: 0.25f)],
                 Settings());
 
             Assert.Contains("scale=480:-2", graph);
@@ -483,7 +485,8 @@ public class FFmpegArgumentBuilderTests
         var third = TestData.Clip(source.Id, 20, 24);
         timeline.Add(2, third);
         timeline.SetLeadingGap(third, TimeSpan.FromSeconds(4));
-        timeline.SetOverlay(third, new OverlayTransform(0.1f, 0.2f, 0.3f, 0.4f, 0.5f));
+        timeline.SetOverlay(third, new OverlayTransform(0.1f, 0.2f, 0.3f, 0.4f));
+        timeline.SetClipAudio(third, new ClipAudio(0.5f, false));
 
         var overlays = FFmpegArgumentBuilder.BuildOverlayItems(timeline, sources);
 
@@ -492,7 +495,8 @@ public class FFmpegArgumentBuilderTests
         Assert.Equal(TimeSpan.FromSeconds(3), overlays[1].Start);
         Assert.Equal(TimeSpan.FromSeconds(4), overlays[2].Start);
         Assert.Equal(TimeSpan.FromSeconds(20), overlays[2].In);
-        Assert.Equal(new OverlayTransform(0.1f, 0.2f, 0.3f, 0.4f, 0.5f), overlays[2].Transform);
+        Assert.Equal(new OverlayTransform(0.1f, 0.2f, 0.3f, 0.4f), overlays[2].Transform);
+        Assert.Equal(new ClipAudio(0.5f, false), overlays[2].Audio);
         Assert.True(overlays[0].HasAudio);
     }
 

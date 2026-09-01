@@ -549,7 +549,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     public void AddTrack()
     {
-        if (_timeline.Tracks.Count >= Domain.Timeline.MaxTracks)
+        if (_timeline.VideoTrackCount >= Domain.Timeline.MaxVideoTracks)
         {
             return;
         }
@@ -572,6 +572,9 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     public void SetOverlayTransform(Clip clip, OverlayTransform transform) =>
         Execute(new SetOverlayTransformCommand(clip, transform));
+
+    public void SetClipAudio(Clip clip, ClipAudio audio) =>
+        Execute(new SetClipAudioCommand(clip, audio));
 
     public void Execute(IEditCommand command)
     {

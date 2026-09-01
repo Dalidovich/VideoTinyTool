@@ -45,6 +45,8 @@ public interface IEditorHost
 
     void SetOverlayTransform(Clip clip, OverlayTransform transform);
 
+    void SetClipAudio(Clip clip, ClipAudio audio);
+
     void Execute(IEditCommand command);
 
     void SeekTo(TimeSpan position, bool scrubbing);

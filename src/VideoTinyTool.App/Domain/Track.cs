@@ -5,16 +5,26 @@ public sealed class Track
     private readonly List<Clip> _clips = new();
 
     public Track()
-        : this(Guid.NewGuid())
+        : this(Guid.NewGuid(), TrackKind.Video)
     {
     }
 
-    public Track(Guid id)
+    public Track(TrackKind kind)
+        : this(Guid.NewGuid(), kind)
+    {
+    }
+
+    public Track(Guid id, TrackKind kind)
     {
         Id = id;
+        Kind = kind;
     }
 
     public Guid Id { get; }
+
+    public TrackKind Kind { get; }
+
+    public bool IsAudio => Kind == TrackKind.Audio;
 
     public IReadOnlyList<Clip> Clips => _clips;
 

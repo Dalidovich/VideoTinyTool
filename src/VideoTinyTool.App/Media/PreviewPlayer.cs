@@ -443,7 +443,7 @@ public sealed class PreviewPlayer : IDisposable
 
     private void SyncOverlayTracks()
     {
-        var wanted = _timeline.Tracks.Count - 1;
+        var wanted = _timeline.VideoTrackCount - 1;
 
         while (_overlayTracks.Count > wanted)
         {
@@ -637,7 +637,7 @@ public sealed class PreviewPlayer : IDisposable
         {
             if (track.Current is { Ring: { } ring } pipeline)
             {
-                _mixInputs.Add((ring, pipeline.Clip.Overlay.Volume));
+                _mixInputs.Add((ring, pipeline.Clip.Audio.Gain));
             }
         }
 
