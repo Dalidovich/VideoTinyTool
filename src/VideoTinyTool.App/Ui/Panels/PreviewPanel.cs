@@ -3,6 +3,7 @@ using SFML.System;
 using SFML.Window;
 using VideoTinyTool.Domain;
 using VideoTinyTool.Localization;
+using VideoTinyTool.Media;
 using VideoTinyTool.Ui.Widgets;
 
 namespace VideoTinyTool.Ui.Panels;
@@ -15,6 +16,7 @@ public sealed class PreviewPanel : PanelBase
     private const float SliderHeight = 10f;
     private const float ValueWidth = 40f;
     private const float ResetHeight = 18f;
+    private const float ScopePadding = 20f;
 
     private readonly IEditorHost _host;
     private readonly Button _toStart = new("|◀");
@@ -158,12 +160,14 @@ public sealed class PreviewPanel : PanelBase
     {
         renderer.FillRect(Bounds, Theme.Sunk);
 
-        var meta = OverlayClip is null
-            ? I18n.Preview.Format(
-                _host.Settings.Export.Width,
-                _host.Settings.Export.Height,
-                _host.Settings.Export.FrameRate)
-            : I18n.Preview.OverlayHint;
+        var meta = _host.Timeline.IsAudioOnly
+            ? I18n.Preview.AudioOnly
+            : OverlayClip is null
+                ? I18n.Preview.Format(
+                    _host.Settings.Export.Width,
+                    _host.Settings.Export.Height,
+                    _host.Settings.Export.FrameRate)
+                : I18n.Preview.OverlayHint;
 
         DrawHeader(renderer, I18n.Preview.Title, meta);
         DrawFrame(renderer);
@@ -181,10 +185,16 @@ public sealed class PreviewPanel : PanelBase
         var frame = FrameBounds;
         renderer.FillRect(frame, Theme.FrameVoid);
 
-        if (_host.Timeline.Clips.Count == 0)
+        if (!_host.Timeline.HasClips)
         {
             _videoBounds = default;
             renderer.DrawTextCentered(I18n.Preview.EmptyTimeline, frame, Theme.FontSizeBody, Theme.TextFaint);
+            return;
+        }
+
+        if (_host.Timeline.IsAudioOnly)
+        {
+            DrawAudioScope(renderer, frame);
             return;
         }
 
@@ -239,6 +249,108 @@ public sealed class PreviewPanel : PanelBase
                 Theme.Accent,
                 TextFont.Mono);
         }
+    }
+
+    private void DrawAudioScope(Renderer renderer, FloatRect frame)
+    {
+        _videoBounds = default;
+
+        var inner = new FloatRect(
+            new Vector2f(frame.Left + ScopePadding, frame.Top + ScopePadding),
+            new Vector2f(
+                Math.Max(1f, frame.Width - (ScopePadding * 2f)),
+                Math.Max(1f, frame.Height - (ScopePadding * 2f))));
+
+        var centre = MathF.Round(inner.Top + (inner.Height / 2f));
+        renderer.HorizontalLine(inner.Left, centre, inner.Width, Theme.Line);
+
+        if (AudioAtPlayhead() is not { } located)
+        {
+            renderer.DrawTextCentered(I18n.Preview.AudioSilence, frame, Theme.FontSizeBody, Theme.TextFaint);
+            return;
+        }
+
+        var (clip, source) = located;
+        var seconds = clip.Duration.TotalSeconds;
+        if (seconds <= 0)
+        {
+            return;
+        }
+
+        var peaks = _host.Waveforms.Get(source);
+        var half = MathF.Max(1f, (inner.Height / 2f) - 1f);
+        var gain = clip.Audio.Gain;
+
+        if (peaks is { Length: > 0 } && gain > 0f)
+        {
+            var pixelsPerSecond = (float)(inner.Width / seconds);
+            var span = peaks.AsSpan();
+
+            renderer.PushClip(inner);
+
+            for (var column = 0; column < (int)inner.Width; column++)
+            {
+                var (from, to) = WaveformGeometry.ColumnRange(clip.In, column, 1f, pixelsPerSecond);
+                var peak = WaveformGeometry.PeakBetween(
+                    span,
+                    WaveformGeometry.BucketAt(from, WaveformService.BucketsPerSecond),
+                    WaveformGeometry.BucketAt(to, WaveformService.BucketsPerSecond));
+
+                var amplitude = peak / 255f * gain * half;
+                if (amplitude < 0.5f)
+                {
+                    continue;
+                }
+
+                renderer.FillRect(inner.Left + column, centre - amplitude, 1f, amplitude * 2f, Theme.Waveform);
+            }
+
+            renderer.PopClip();
+        }
+
+        var offset = (_host.Player.Position - _host.Timeline.StartOf(clip)).TotalSeconds;
+        var cursor = MathF.Round(inner.Left + (float)(Math.Clamp(offset / seconds, 0, 1) * inner.Width));
+        renderer.VerticalLine(cursor, inner.Top, inner.Height, Theme.Accent);
+
+        renderer.DrawText(
+            renderer.Ellipsize(source.FileName, inner.Width, Theme.FontSizeLabel),
+            inner.Left,
+            frame.Top + 6f,
+            Theme.FontSizeLabel,
+            Theme.TextDim);
+    }
+
+    private (Clip Clip, MediaSource Source)? AudioAtPlayhead()
+    {
+        var timeline = _host.Timeline;
+        var position = _host.Player.Position;
+
+        if (timeline.IsAudioTrack(_host.SelectedTrackIndex)
+            && AudioOnTrack(_host.SelectedTrackIndex, position) is { } preferred)
+        {
+            return preferred;
+        }
+
+        for (var track = timeline.FirstAudioTrackIndex; track < timeline.Tracks.Count; track++)
+        {
+            if (AudioOnTrack(track, position) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    private (Clip Clip, MediaSource Source)? AudioOnTrack(int trackIndex, TimeSpan position)
+    {
+        if (_host.Timeline.Resolve(trackIndex, position) is not { } location)
+        {
+            return null;
+        }
+
+        var source = _host.FindSource(location.Clip.SourceId);
+        return source is null ? null : (location.Clip, source);
     }
 
     private void DrawOverlays(Renderer renderer, FloatRect video)
@@ -359,7 +471,7 @@ public sealed class PreviewPanel : PanelBase
         renderer.FillRect(transport, Theme.Chrome);
         renderer.HorizontalLine(transport.Left, transport.Top, transport.Width, Theme.Line);
 
-        var hasClips = _host.Timeline.Clips.Count > 0;
+        var hasClips = _host.Timeline.HasClips;
         _toStart.Enabled = hasClips;
         _toEnd.Enabled = hasClips;
         _playPause.Enabled = hasClips;
@@ -560,7 +672,7 @@ public sealed class PreviewPanel : PanelBase
 
     private void ShowMenu(Vector2f point)
     {
-        var hasClips = _host.Timeline.Clips.Count > 0;
+        var hasClips = _host.Timeline.HasClips;
         var menu = new ContextMenu(point);
 
         menu.Add(
@@ -616,7 +728,7 @@ public sealed class PreviewPanel : PanelBase
             return;
         }
 
-        if (_host.Timeline.Clips.Count == 0)
+        if (!_host.Timeline.HasClips)
         {
             return;
         }

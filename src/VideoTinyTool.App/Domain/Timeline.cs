@@ -55,6 +55,41 @@ public sealed class Timeline
 
     public int AudioTrackCount => _tracks.Count - VideoTrackCount;
 
+    public bool HasClips
+    {
+        get
+        {
+            foreach (var track in _tracks)
+            {
+                if (track.Clips.Count > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
+    public bool HasVideoClips
+    {
+        get
+        {
+            var videoCount = VideoTrackCount;
+            for (var i = 0; i < videoCount; i++)
+            {
+                if (_tracks[i].Clips.Count > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
+    public bool IsAudioOnly => HasClips && !HasVideoClips;
+
     public int FirstAudioTrackIndex => VideoTrackCount;
 
     public bool IsAudioTrack(int index) => index >= 0 && index < _tracks.Count && _tracks[index].IsAudio;

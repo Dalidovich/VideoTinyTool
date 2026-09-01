@@ -46,21 +46,53 @@ public sealed class ExportService : IDisposable
         string outputPath,
         TimeSpan totalDuration)
     {
+        if (!TryClaim(outputPath))
+        {
+            return;
+        }
+
+        Launch(
+            FFmpegArgumentBuilder.Build(items, overlays, audio, export, outputPath),
+            outputPath,
+            totalDuration);
+    }
+
+    public void StartAudioOnly(
+        IReadOnlyList<AudioItem> audio,
+        ExportSettings export,
+        string outputPath,
+        TimeSpan timelineDuration)
+    {
+        if (!TryClaim(outputPath))
+        {
+            return;
+        }
+
+        Launch(
+            FFmpegArgumentBuilder.BuildAudioOnly(audio, export, outputPath, timelineDuration),
+            outputPath,
+            FFmpegArgumentBuilder.OutputDuration(timelineDuration, export));
+    }
+
+    private bool TryClaim(string outputPath)
+    {
         lock (_gate)
         {
             if (IsRunning)
             {
-                return;
+                return false;
             }
 
             IsRunning = true;
             Progress = 0;
             _cancelRequested = false;
             CurrentOutputPath = outputPath;
+            return true;
         }
+    }
 
-        var arguments = FFmpegArgumentBuilder.Build(items, overlays, audio, export, outputPath);
-
+    private void Launch(string arguments, string outputPath, TimeSpan totalDuration)
+    {
         _worker = new Thread(() => Run(arguments, outputPath, totalDuration))
         {
             IsBackground = true,

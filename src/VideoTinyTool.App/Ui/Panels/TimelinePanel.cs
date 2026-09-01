@@ -807,7 +807,7 @@ public sealed class TimelinePanel : PanelBase
             AddHistoryItems(menu);
             menu.Separator();
             menu.Add(I18n.Menu.Import, "Ctrl+O", true, _host.ImportFiles);
-            menu.Add(I18n.Menu.Export, "Ctrl+M", _host.Timeline.Clips.Count > 0, _host.ExportTimeline);
+            menu.Add(I18n.Menu.Export, "Ctrl+M", _host.Timeline.HasClips, _host.ExportTimeline);
         }
 
         _host.ShowContextMenu(menu);

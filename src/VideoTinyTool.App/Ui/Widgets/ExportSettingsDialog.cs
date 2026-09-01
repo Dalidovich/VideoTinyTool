@@ -21,6 +21,7 @@ public sealed class ExportSettingsDialog : ModalDialog
     private static readonly string[] Containers = ["mp4", "mkv", "mov"];
     private static readonly string[] VideoCodecs = ["libx264", "libx265"];
     private static readonly string[] AudioCodecs = ["aac", "libmp3lame", "ac3"];
+    private static readonly string[] AudioContainers = ["mp3", "m4a"];
 
     private static readonly string[] Presets =
     [
@@ -43,9 +44,34 @@ public sealed class ExportSettingsDialog : ModalDialog
     private Vector2f _pointer;
     private Row? _hovered;
 
-    public ExportSettingsDialog(ExportSettings export) : base(I18n.ExportSetup.Title, string.Empty)
+    public ExportSettingsDialog(ExportSettings export, bool audioOnly = false)
+        : base(I18n.ExportSetup.Title, string.Empty)
     {
-        _rows =
+        _rows = audioOnly ? AudioRows(export) : VideoRows(export);
+    }
+
+    private static List<Row> AudioRows(ExportSettings export) =>
+        [
+            new Row(
+                I18n.ExportSetup.AudioFormat,
+                I18n.ExportSetup.AudioFormatHint,
+                new OptionPicker(Options(AudioContainers, export.AudioContainer), export.AudioContainer),
+                (settings, value) => settings.AudioContainer = value),
+
+            new Row(
+                I18n.ExportSetup.AudioBitrate,
+                I18n.ExportSetup.AudioBitrateHint,
+                new OptionPicker(Options(AudioBitrates, export.AudioBitrateKbps), Number(export.AudioBitrateKbps)),
+                (settings, value) => settings.AudioBitrateKbps = Number(value)),
+
+            new Row(
+                I18n.ExportSetup.Speed,
+                I18n.ExportSetup.AudioSpeedHint,
+                new OptionPicker(Options(Speeds, export.Speed), Number(export.Speed)),
+                (settings, value) => settings.Speed = Fraction(value))
+        ];
+
+    private static List<Row> VideoRows(ExportSettings export) =>
         [
             new Row(
                 I18n.ExportSetup.Container,
@@ -103,7 +129,6 @@ public sealed class ExportSettingsDialog : ModalDialog
                 new OptionPicker(Options(AudioBitrates, export.AudioBitrateKbps), Number(export.AudioBitrateKbps)),
                 (settings, value) => settings.AudioBitrateKbps = Number(value))
         ];
-    }
 
     public void Apply(ExportSettings export)
     {

@@ -41,6 +41,7 @@ public static class FFmpegArgumentBuilder
 {
     private const string SpeedVideoLabel = "[vspeed]";
     private const string SpeedAudioLabel = "[aspeed]";
+    private const string AudioOnlyMixLabel = "[aout]";
     private const double MaxTempoStep = 2.0;
     private const double SpeedTolerance = 0.0005;
 
@@ -181,6 +182,66 @@ public static class FFmpegArgumentBuilder
         args.Append(' ').Append(Quote(outputPath));
 
         return args.ToString();
+    }
+
+    public static string BuildAudioOnly(
+        IReadOnlyList<AudioItem> audio,
+        ExportSettings export,
+        string outputPath,
+        TimeSpan timelineDuration)
+    {
+        var args = new StringBuilder();
+        args.Append("-y -hide_banner -stats");
+
+        foreach (var track in audio)
+        {
+            args.Append(" -ss ").Append(Seconds(track.In));
+            args.Append(" -t ").Append(Seconds(track.Duration));
+            args.Append(" -i ").Append(Quote(track.SourcePath));
+        }
+
+        args.Append(" -f lavfi -i ").Append(Quote(SilentBed(timelineDuration)));
+        args.Append(" -filter_complex ").Append(Quote(BuildAudioOnlyFilterGraph(audio, export)));
+        args.Append(" -map ").Append(Quote(AudioOnlyLabel(export)));
+        args.Append(" -vn");
+        args.Append(" -c:a ").Append(ExportSettings.AudioCodecFor(export.AudioContainer));
+        args.Append(" -b:a ").Append(export.AudioBitrateKbps.ToString(CultureInfo.InvariantCulture)).Append('k');
+        args.Append(' ').Append(Quote(outputPath));
+
+        return args.ToString();
+    }
+
+    public static string BuildAudioOnlyFilterGraph(IReadOnlyList<AudioItem> audio, ExportSettings export)
+    {
+        var graph = new StringBuilder();
+        var mix = new StringBuilder();
+        var mixInputs = 1;
+
+        for (var k = 0; k < audio.Count; k++)
+        {
+            if (!audio[k].HasSound)
+            {
+                continue;
+            }
+
+            AppendDelayedSource(graph, k, audio[k].Gain, audio[k].Start);
+            graph.Append("[aa").Append(k).Append("];");
+
+            mix.Append("[aa").Append(k).Append(']');
+            mixInputs++;
+        }
+
+        graph.Append('[').Append(audio.Count).Append(":a]").Append(mix);
+        graph.Append("amix=inputs=").Append(mixInputs.ToString(CultureInfo.InvariantCulture));
+        graph.Append(":normalize=0:dropout_transition=0").Append(AudioOnlyMixLabel);
+
+        var speed = ExportSettings.ClampSpeed(export.Speed);
+        if (ChangesSpeed(speed))
+        {
+            graph.Append(';').Append(AudioOnlyMixLabel).Append(Tempo(speed)).Append(SpeedAudioLabel);
+        }
+
+        return graph.ToString();
     }
 
     public static string BuildFilterGraph(IReadOnlyList<ExportItem> items, ExportSettings export) =>
@@ -388,6 +449,12 @@ public static class FFmpegArgumentBuilder
         graph.Append(Tempo(speed));
         graph.Append(SpeedAudioLabel);
     }
+
+    private static string SilentBed(TimeSpan duration) =>
+        "anullsrc=channel_layout=stereo:sample_rate=48000:d=" + Seconds(duration);
+
+    private static string AudioOnlyLabel(ExportSettings export) =>
+        ChangesSpeed(ExportSettings.ClampSpeed(export.Speed)) ? SpeedAudioLabel : AudioOnlyMixLabel;
 
     private static int InputCount(IReadOnlyList<ExportItem> items)
     {

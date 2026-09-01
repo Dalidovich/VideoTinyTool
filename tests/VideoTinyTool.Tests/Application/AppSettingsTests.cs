@@ -22,6 +22,29 @@ public class AppSettingsTests
     }
 
     [Theory]
+    [InlineData("", "mp3")]
+    [InlineData("   ", "mp3")]
+    [InlineData(".m4a", "m4a")]
+    [InlineData("m4a", "m4a")]
+    public void SanitizeNormalisesTheAudioContainer(string container, string expected)
+    {
+        var settings = new AppSettings { Export = { AudioContainer = container } };
+
+        settings.Sanitize();
+
+        Assert.Equal(expected, settings.Export.AudioContainer);
+    }
+
+    [Theory]
+    [InlineData("mp3", "libmp3lame")]
+    [InlineData("m4a", "aac")]
+    [InlineData("M4A", "aac")]
+    public void AudioCodecFollowsTheAudioContainer(string container, string expected)
+    {
+        Assert.Equal(expected, ExportSettings.AudioCodecFor(container));
+    }
+
+    [Theory]
     [InlineData("ru", "ru")]
     [InlineData(" RU ", "ru")]
     [InlineData("pt-br", "pt-br")]

@@ -32,9 +32,13 @@ public sealed class ExportSettings
     public double Speed { get; set; } = NormalSpeed;
     public string AudioCodec { get; set; } = "aac";
     public int AudioBitrateKbps { get; set; } = 192;
+    public string AudioContainer { get; set; } = "mp3";
 
     public static double ClampSpeed(double value) =>
         double.IsFinite(value) && value > 0 ? Math.Clamp(value, MinSpeed, MaxSpeed) : NormalSpeed;
+
+    public static string AudioCodecFor(string container) =>
+        container.Equals("m4a", StringComparison.OrdinalIgnoreCase) ? "aac" : "libmp3lame";
 }
 
 public sealed class PreviewSettings
@@ -71,6 +75,7 @@ public sealed class AppSettings
         Export.FrameRate = Math.Clamp(Export.FrameRate <= 0 ? 30 : Export.FrameRate, 1, 240);
         Export.Speed = ExportSettings.ClampSpeed(Export.Speed);
         Export.AudioBitrateKbps = Math.Clamp(Export.AudioBitrateKbps <= 0 ? 192 : Export.AudioBitrateKbps, 32, 512);
+        Export.AudioContainer = Fallback(Export.AudioContainer, "mp3").TrimStart('.');
 
         Preview.Width = EvenClamp(Preview.Width, 960, 160, 3840);
         Preview.Height = EvenClamp(Preview.Height, 540, 90, 2160);

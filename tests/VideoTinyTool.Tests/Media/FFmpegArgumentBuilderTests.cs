@@ -707,6 +707,114 @@ public class FFmpegArgumentBuilderTests
         Assert.Equal(TimeSpan.FromSeconds(5), audio[0].Duration);
     }
 
+    private static ExportSettings AudioSettings(string container = "mp3", double speed = ExportSettings.NormalSpeed)
+    {
+        var settings = Settings(speed);
+        settings.AudioContainer = container;
+        return settings;
+    }
+
+    [Fact]
+    public void AudioOnly_WritesEveryTrackAsAnInputAndMapsTheMix()
+    {
+        var args = FFmpegArgumentBuilder.BuildAudioOnly(
+            [Audio(@"C:\media\track.mp3", 0.5, 4.25, 2.5)],
+            AudioSettings(),
+            @"C:\out\result.mp3",
+            TimeSpan.FromSeconds(10));
+
+        Assert.Contains(@"-ss 0.5 -t 3.75 -i ""C:\media\track.mp3""", args);
+        Assert.Contains(@"-f lavfi -i ""anullsrc=channel_layout=stereo:sample_rate=48000:d=10""", args);
+        Assert.Contains(
+            "volume=1,adelay=2500|2500[aa0];[1:a][aa0]amix=inputs=2:normalize=0:dropout_transition=0[aout]",
+            args);
+        Assert.Contains(@"-map ""[aout]""", args);
+        Assert.Contains("-c:a libmp3lame", args);
+        Assert.Contains("-b:a 192k", args);
+        Assert.EndsWith(@"""C:\out\result.mp3""", args);
+    }
+
+    [Fact]
+    public void AudioOnly_CarriesNoVideoStream()
+    {
+        var args = FFmpegArgumentBuilder.BuildAudioOnly(
+            [Audio(@"C:\media\track.mp3", 0, 4, 0)],
+            AudioSettings(),
+            @"C:\out\result.mp3",
+            TimeSpan.FromSeconds(4));
+
+        Assert.Contains(" -vn", args);
+        Assert.DoesNotContain("-c:v", args);
+        Assert.DoesNotContain("[v]", args);
+    }
+
+    [Fact]
+    public void AudioOnly_UsesTheEncoderThatMatchesTheContainer()
+    {
+        var args = FFmpegArgumentBuilder.BuildAudioOnly(
+            [Audio(@"C:\media\track.mp3", 0, 4, 0)],
+            AudioSettings("m4a"),
+            @"C:\out\result.m4a",
+            TimeSpan.FromSeconds(4));
+
+        Assert.Contains("-c:a aac", args);
+    }
+
+    [Fact]
+    public void AudioOnly_AppliesSpeedWithATempoAndMapsTheSpedUpLabel()
+    {
+        var args = FFmpegArgumentBuilder.BuildAudioOnly(
+            [Audio(@"C:\media\track.mp3", 0, 8, 0)],
+            AudioSettings(speed: 1.5),
+            @"C:\out\result.mp3",
+            TimeSpan.FromSeconds(8));
+
+        Assert.Contains("[aout]atempo=1.5[aspeed]", args);
+        Assert.Contains(@"-map ""[aspeed]""", args);
+    }
+
+    [Fact]
+    public void AudioOnly_AboveDoubleSpeed_ChainsTwoTempoSteps()
+    {
+        var args = FFmpegArgumentBuilder.BuildAudioOnly(
+            [Audio(@"C:\media\track.mp3", 0, 8, 0)],
+            AudioSettings(speed: 3),
+            @"C:\out\result.mp3",
+            TimeSpan.FromSeconds(8));
+
+        Assert.Contains("[aout]atempo=2,atempo=1.5[aspeed]", args);
+    }
+
+    [Fact]
+    public void AudioOnly_WithoutAudibleTracks_StillRendersSilenceForTheWholeTimeline()
+    {
+        var args = FFmpegArgumentBuilder.BuildAudioOnly(
+            [],
+            AudioSettings(),
+            @"C:\out\result.mp3",
+            TimeSpan.FromSeconds(12));
+
+        Assert.Contains(@"-f lavfi -i ""anullsrc=channel_layout=stereo:sample_rate=48000:d=12""", args);
+        Assert.Contains("[0:a]amix=inputs=1:normalize=0:dropout_transition=0[aout]", args);
+    }
+
+    [Fact]
+    public void AudioOnly_DelaysEveryTrackToItsOwnPlaceOnTheTimeline()
+    {
+        var args = FFmpegArgumentBuilder.BuildAudioOnly(
+            [
+                Audio(@"C:\media\one.mp3", 0, 4, 0),
+                Audio(@"C:\media\two.mp3", 1, 3, 6, 0.5f)
+            ],
+            AudioSettings(),
+            @"C:\out\result.mp3",
+            TimeSpan.FromSeconds(9));
+
+        Assert.Contains("adelay=0|0[aa0]", args);
+        Assert.Contains("volume=0.5,adelay=6000|6000[aa1]", args);
+        Assert.Contains("[2:a][aa0][aa1]amix=inputs=3", args);
+    }
+
     [Fact]
     public void AudioNumbers_UseInvariantFormattingUnderACommaDecimalCulture()
     {

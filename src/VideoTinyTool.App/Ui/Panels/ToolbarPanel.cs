@@ -137,7 +137,7 @@ public sealed class ToolbarPanel : PanelBase
         _remove.Enabled = _host.SelectedClip is not null;
         _undo.Enabled = _host.History.CanUndo;
         _redo.Enabled = _host.History.CanRedo;
-        _export.Enabled = _host.Timeline.Clips.Count > 0;
+        _export.Enabled = _host.Timeline.HasClips;
     }
 
     public override void Draw(Renderer renderer)

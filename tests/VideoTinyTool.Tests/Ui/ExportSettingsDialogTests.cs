@@ -36,4 +36,26 @@ public class ExportSettingsDialogTests
         Assert.Equal("ac3", target.AudioCodec);
         Assert.Equal(224, target.AudioBitrateKbps);
     }
+
+    [Fact]
+    public void AudioOnlyDialogAppliesOnlyTheSoundRows()
+    {
+        var current = new ExportSettings
+        {
+            Width = 1280,
+            Height = 720,
+            Speed = 1.5,
+            AudioContainer = "m4a",
+            AudioBitrateKbps = 256
+        };
+
+        var target = new ExportSettings();
+        new ExportSettingsDialog(current, audioOnly: true).Apply(target);
+
+        Assert.Equal("m4a", target.AudioContainer);
+        Assert.Equal(256, target.AudioBitrateKbps);
+        Assert.Equal(1.5, target.Speed);
+        Assert.Equal(1920, target.Width);
+        Assert.Equal(1080, target.Height);
+    }
 }

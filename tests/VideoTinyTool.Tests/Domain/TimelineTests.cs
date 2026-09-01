@@ -19,6 +19,51 @@ public class TimelineTests
     }
 
     [Fact]
+    public void EmptyTimeline_HasNoClipsAndIsNotAudioOnly()
+    {
+        var timeline = new Timeline();
+
+        Assert.False(timeline.HasClips);
+        Assert.False(timeline.HasVideoClips);
+        Assert.False(timeline.IsAudioOnly);
+    }
+
+    [Fact]
+    public void TimelineWithClipsOnlyOnAnAudioTrack_IsAudioOnly()
+    {
+        var timeline = new Timeline();
+        timeline.AddTrack(TrackKind.Audio);
+        timeline.Add(1, TestData.Clip(Guid.NewGuid(), 0, 5));
+
+        Assert.True(timeline.HasClips);
+        Assert.False(timeline.HasVideoClips);
+        Assert.True(timeline.IsAudioOnly);
+    }
+
+    [Fact]
+    public void TimelineWithAVideoClip_IsNotAudioOnly()
+    {
+        var timeline = new Timeline();
+        timeline.AddTrack(TrackKind.Audio);
+        timeline.Add(TestData.Clip(Guid.NewGuid(), 0, 5));
+        timeline.Add(1, TestData.Clip(Guid.NewGuid(), 0, 5));
+
+        Assert.True(timeline.HasVideoClips);
+        Assert.False(timeline.IsAudioOnly);
+    }
+
+    [Fact]
+    public void ClipsOnAnOverlayTrackAloneCountAsVideo()
+    {
+        var timeline = new Timeline();
+        timeline.AddTrack(TrackKind.Video);
+        timeline.Add(1, TestData.Clip(Guid.NewGuid(), 0, 5));
+
+        Assert.True(timeline.HasVideoClips);
+        Assert.False(timeline.IsAudioOnly);
+    }
+
+    [Fact]
     public void Resolve_AtTheVeryStart_ReturnsFirstClip()
     {
         var (timeline, _, a, _, _) = TestData.ThreeClipTimeline();

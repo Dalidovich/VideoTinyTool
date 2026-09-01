@@ -128,6 +128,9 @@ public static class I18n
 
         public static string OverlayPercent(float value) =>
             _catalog.Format("preview.overlayPercent", (int)MathF.Round(value * 100f));
+
+        public static string AudioOnly => _catalog.Text("preview.audioOnly");
+        public static string AudioSilence => _catalog.Text("preview.audioSilence");
     }
 
     public static class Sources
@@ -201,6 +204,11 @@ public static class I18n
 
         public static string AudioBitrate => _catalog.Text("exportSetup.audioBitrate");
         public static string AudioBitrateHint => _catalog.Text("exportSetup.audioBitrateHint");
+
+        public static string AudioFormat => _catalog.Text("exportSetup.audioFormat");
+        public static string AudioFormatHint => _catalog.Text("exportSetup.audioFormatHint");
+
+        public static string AudioSpeedHint => _catalog.Text("exportSetup.audioSpeedHint");
     }
 
     public static class Dialogs
@@ -258,6 +266,9 @@ public static class I18n
 
         public static string ContainerVideo(string container) =>
             _catalog.Format("fileDialogs.containerVideo", container.ToUpperInvariant());
+
+        public static string ContainerAudio(string container) =>
+            _catalog.Format("fileDialogs.containerAudio", container.ToUpperInvariant());
 
         public static string DefaultExportName(string container) =>
             _catalog.Format("fileDialogs.defaultExportName", container);

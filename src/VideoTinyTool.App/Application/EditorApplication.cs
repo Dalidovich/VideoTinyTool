@@ -456,7 +456,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     private void Shuttle(int direction)
     {
-        if (_timeline.Clips.Count == 0)
+        if (!_timeline.HasClips)
         {
             return;
         }
@@ -694,7 +694,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     public void TogglePlayback()
     {
-        if (_timeline.Clips.Count == 0)
+        if (!_timeline.HasClips)
         {
             return;
         }
@@ -762,7 +762,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     public void ExportTimeline()
     {
-        if (_timeline.Clips.Count == 0 || _export.IsRunning)
+        if (!_timeline.HasClips || _export.IsRunning)
         {
             return;
         }
@@ -785,7 +785,7 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
         _player.Pause();
 
-        var setup = new ExportSettingsDialog(_settings.Export);
+        var setup = new ExportSettingsDialog(_settings.Export, _timeline.IsAudioOnly);
 
         setup.AddButton(I18n.ExportSetup.Start, ButtonStyle.Accent, () =>
         {
@@ -800,10 +800,26 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
     private void BeginExport()
     {
-        var container = _settings.Export.Container;
-        var path = NativeFileDialog.SaveFile(_window.NativeHandle, container, I18n.FileDialogs.DefaultExportName(container));
+        var audioOnly = _timeline.IsAudioOnly;
+        var container = audioOnly ? _settings.Export.AudioContainer : _settings.Export.Container;
+
+        var path = NativeFileDialog.SaveFile(
+            _window.NativeHandle,
+            container,
+            I18n.FileDialogs.DefaultExportName(container),
+            audioOnly ? I18n.FileDialogs.ContainerAudio(container) : I18n.FileDialogs.ContainerVideo(container));
+
         if (path is null)
         {
+            return;
+        }
+
+        var audio = FFmpegArgumentBuilder.BuildAudioItems(_timeline, _sourceIndex);
+
+        if (audioOnly)
+        {
+            ShowExportProgress(path);
+            _export.StartAudioOnly(audio, _settings.Export, path, _timeline.TotalDuration);
             return;
         }
 
@@ -814,11 +830,8 @@ public sealed class EditorApplication : IEditorHost, IDisposable
         }
 
         var overlays = FFmpegArgumentBuilder.BuildOverlayItems(_timeline, _sourceIndex);
-        var audio = FFmpegArgumentBuilder.BuildAudioItems(_timeline, _sourceIndex);
 
-        _progressDialog = new ProgressDialog(I18n.Dialogs.ExportingTitle, path);
-        _progressDialog.AddButton(I18n.Dialogs.Cancel, ButtonStyle.Normal, () => _export.Cancel());
-        ShowDialog(_progressDialog);
+        ShowExportProgress(path);
 
         _export.Start(
             items,
@@ -827,6 +840,13 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             _settings.Export,
             path,
             FFmpegArgumentBuilder.OutputDuration(_timeline.TotalDuration, _settings.Export));
+    }
+
+    private void ShowExportProgress(string path)
+    {
+        _progressDialog = new ProgressDialog(I18n.Dialogs.ExportingTitle, path);
+        _progressDialog.AddButton(I18n.Dialogs.Cancel, ButtonStyle.Normal, () => _export.Cancel());
+        ShowDialog(_progressDialog);
     }
 
     public void SplitAtPlayhead()

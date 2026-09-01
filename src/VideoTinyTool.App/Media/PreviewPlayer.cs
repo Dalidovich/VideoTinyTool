@@ -117,7 +117,7 @@ public sealed class PreviewPlayer : IDisposable
 
     public void Play()
     {
-        if (IsPlaying || _timeline.Clips.Count == 0)
+        if (IsPlaying || !_timeline.HasClips)
         {
             return;
         }
@@ -128,7 +128,7 @@ public sealed class PreviewPlayer : IDisposable
 
     public void PlayAtRate(double rate)
     {
-        if (_timeline.Clips.Count == 0)
+        if (!_timeline.HasClips)
         {
             return;
         }
@@ -200,7 +200,7 @@ public sealed class PreviewPlayer : IDisposable
         SyncAudioTracks();
         _pausedPosition = position;
 
-        if (_timeline.Clips.Count == 0)
+        if (!_timeline.HasClips)
         {
             _liveFrameValid = false;
             _inGap = false;
@@ -327,18 +327,15 @@ public sealed class PreviewPlayer : IDisposable
         RefreshAudioMix();
     }
 
+    private TimeSpan GapEndAfter(TimeSpan from)
+    {
+        var next = _timeline.NextClipStart(from);
+        return next > from ? next : Duration;
+    }
+
     private void EnterGap(TimeSpan from, TimeSpan until)
     {
         DisposeBasePipelines();
-
-        if (HasTrackAudio)
-        {
-            RefreshAudioMix();
-        }
-        else
-        {
-            SilenceAudio();
-        }
 
         _gapEnd = until;
         _inGap = true;
@@ -348,11 +345,52 @@ public sealed class PreviewPlayer : IDisposable
         _clock.StartSystem(from, _rate);
         IsPlaying = true;
         _resumeAt = null;
+
+        if (HasTrackAudio)
+        {
+            RefreshAudioMix();
+        }
+        else
+        {
+            SilenceAudio();
+        }
+    }
+
+    private void PrimeAudioTracks(TimeSpan target, bool withAudio)
+    {
+        if (!withAudio || _audioTracks.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var track in _audioTracks)
+        {
+            SyncAudioPipeline(track, target, withAudio);
+        }
+
+        var deadline = DateTime.UtcNow + PrimeTimeout;
+        while (DateTime.UtcNow < deadline && !AudioTracksPrimed())
+        {
+            Thread.Sleep(4);
+        }
+    }
+
+    private bool AudioTracksPrimed()
+    {
+        foreach (var track in _audioTracks)
+        {
+            if (track.Current is { } pipeline && !pipeline.Primed && !pipeline.Exhausted)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void StartPlayback(TimeSpan position, bool withAudio)
     {
-        if (_timeline.Clips.Count == 0)
+        if (!_timeline.HasClips)
         {
             return;
         }
@@ -366,7 +404,8 @@ public sealed class PreviewPlayer : IDisposable
         var location = _timeline.Resolve(target);
         if (location is null)
         {
-            EnterGap(target, _timeline.NextClipStart(target));
+            PrimeAudioTracks(target, withAudio);
+            EnterGap(target, GapEndAfter(target));
             return;
         }
 
@@ -881,7 +920,7 @@ public sealed class PreviewPlayer : IDisposable
 
     private void RequestStillFrame(TimeSpan position)
     {
-        if (_timeline.Clips.Count == 0)
+        if (!_timeline.HasClips)
         {
             _liveFrameValid = false;
             _inGap = false;

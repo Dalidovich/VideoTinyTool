@@ -92,7 +92,7 @@ public static class NativeFileDialog
         }
     }
 
-    public static string? SaveFile(IntPtr owner, string container, string suggestedName)
+    public static string? SaveFile(IntPtr owner, string container, string suggestedName, string filterLabel)
     {
         var buffer = Marshal.AllocHGlobal(1024 * sizeof(char));
         try
@@ -106,7 +106,7 @@ public static class NativeFileDialog
             {
                 lStructSize = Marshal.SizeOf<OpenFileName>(),
                 hwndOwner = owner,
-                lpstrFilter = BuildFilter((I18n.FileDialogs.ContainerVideo(container), $"*.{container}"), (I18n.FileDialogs.AllFiles, "*.*")),
+                lpstrFilter = BuildFilter((filterLabel, $"*.{container}"), (I18n.FileDialogs.AllFiles, "*.*")),
                 nFilterIndex = 1,
                 lpstrFile = buffer,
                 nMaxFile = 1024,

@@ -86,7 +86,9 @@
     "overlayOpacity": "Opacity",
     "overlayVolume": "Volume",
     "overlayReset": "Reset",
-    "overlayPercent": "{0}%"
+    "overlayPercent": "{0}%",
+    "audioOnly": "Audio only",
+    "audioSilence": "Silence"
   },
   "sources": {
     "title": "Sources",
@@ -140,7 +142,10 @@
     "audioCodec": "Audio codec",
     "audioCodecHint": "Encoder for the sound track. aac is the standard companion of mp4 and plays everywhere, libmp3lame is the classic mp3, ac3 is used by DVD and broadcast.",
     "audioBitrate": "Audio bitrate, kbps",
-    "audioBitrateHint": "Sound quality: 128 is enough for speech, 192 is the usual choice for music, above 256 the difference is barely audible."
+    "audioBitrateHint": "Sound quality: 128 is enough for speech, 192 is the usual choice for music, above 256 the difference is barely audible.",
+    "audioFormat": "Audio format",
+    "audioFormatHint": "File format of the exported sound. mp3 plays on anything, m4a keeps the aac encoder used inside mp4 and sounds better at the same bitrate.",
+    "audioSpeedHint": "Playback speed of the result. 1 keeps the original pace, values above it shorten the track, values below it stretch it. The pitch stays the same."
   },
   "dialogs": {
     "ok": "OK",
@@ -182,6 +187,7 @@
     "audioFiles": "Audio files",
     "allFiles": "All files",
     "containerVideo": "{0} video",
+    "containerAudio": "{0} audio",
     "defaultExportName": "timeline.{0}"
   },
   "startup": {
