@@ -74,6 +74,23 @@ public sealed class ExportService : IDisposable
             FFmpegArgumentBuilder.OutputDuration(timelineDuration, export));
     }
 
+    public void StartFrame(
+        FrameItem frame,
+        IReadOnlyList<FrameOverlayItem> overlays,
+        ExportSettings export,
+        string outputPath)
+    {
+        if (!TryClaim(outputPath))
+        {
+            return;
+        }
+
+        Launch(
+            FFmpegArgumentBuilder.BuildFrame(frame, overlays, export, outputPath),
+            outputPath,
+            TimeSpan.Zero);
+    }
+
     private bool TryClaim(string outputPath)
     {
         lock (_gate)

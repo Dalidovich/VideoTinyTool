@@ -15,6 +15,7 @@
     "undo": "Undo",
     "redo": "Redo",
     "export": "Export…",
+    "frame": "Frame…",
     "help": "?"
   },
   "menu": {
@@ -33,6 +34,7 @@
     "redo": "Redo",
     "import": "Import files…",
     "export": "Export…",
+    "exportFrame": "Save frame…",
     "addToTimeline": "Add to timeline",
     "removeSource": "Remove from list",
     "play": "Play",
@@ -62,6 +64,7 @@
     "redo": "Redo",
     "import": "Import files",
     "export": "Export the timeline",
+    "exportFrame": "Save the frame under the playhead as an image",
     "zoom": "Zoom the timeline in / out",
     "zoomAtCursor": "Zoom around the cursor",
     "scrollTimeline": "Scroll the timeline",
@@ -146,7 +149,13 @@
     "audioBitrateHint": "Sound quality: 128 is enough for speech, 192 is the usual choice for music, above 256 the difference is barely audible.",
     "audioFormat": "Audio format",
     "audioFormatHint": "File format of the exported sound. mp3 plays on anything, m4a keeps the aac encoder used inside mp4 and sounds better at the same bitrate.",
-    "audioSpeedHint": "Playback speed of the result. 1 keeps the original pace, values above it shorten the track, values below it stretch it. The pitch stays the same."
+    "audioSpeedHint": "Playback speed of the result. 1 keeps the original pace, values above it shorten the track, values below it stretch it. The pitch stays the same.",
+    "frameTitle": "Frame settings",
+    "saveFrame": "Save…",
+    "imageFormat": "Image format",
+    "imageFormatHint": "File format of the frame. png keeps the picture pixel for pixel and ignores the quality setting, jpg is several times smaller and loses fine detail.",
+    "imageQuality": "Quality (q:v)",
+    "imageQualityHint": "Compression factor for jpg: the lower the number, the better the picture and the larger the file. 2 is the best the encoder offers, above 10 the artefacts become visible. png ignores it."
   },
   "dialogs": {
     "ok": "OK",
@@ -189,7 +198,10 @@
     "allFiles": "All files",
     "containerVideo": "{0} video",
     "containerAudio": "{0} audio",
-    "defaultExportName": "timeline.{0}"
+    "containerImage": "{0} image",
+    "defaultExportName": "timeline.{0}",
+    "defaultFrameName": "frame.{0}",
+    "frameTitle": "Save frame"
   },
   "startup": {
     "noUsableFont": "No usable font was found. Expected the assets\fonts folder next to the executable.",

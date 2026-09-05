@@ -92,7 +92,12 @@ public static class NativeFileDialog
         }
     }
 
-    public static string? SaveFile(IntPtr owner, string container, string suggestedName, string filterLabel)
+    public static string? SaveFile(
+        IntPtr owner,
+        string container,
+        string suggestedName,
+        string filterLabel,
+        string? title = null)
     {
         var buffer = Marshal.AllocHGlobal(1024 * sizeof(char));
         try
@@ -110,7 +115,7 @@ public static class NativeFileDialog
                 nFilterIndex = 1,
                 lpstrFile = buffer,
                 nMaxFile = 1024,
-                lpstrTitle = I18n.FileDialogs.ExportTitle,
+                lpstrTitle = title ?? I18n.FileDialogs.ExportTitle,
                 lpstrDefExt = container,
                 Flags = OfnExplorer | OfnOverwritePrompt | OfnPathMustExist | OfnHideReadOnly | OfnNoChangeDir
             };

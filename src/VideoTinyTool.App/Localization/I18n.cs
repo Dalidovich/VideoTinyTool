@@ -32,6 +32,7 @@ public static class I18n
         public static string Undo => _catalog.Text("toolbar.undo");
         public static string Redo => _catalog.Text("toolbar.redo");
         public static string Export => _catalog.Text("toolbar.export");
+        public static string Frame => _catalog.Text("toolbar.frame");
         public static string Help => _catalog.Text("toolbar.help");
     }
 
@@ -54,6 +55,7 @@ public static class I18n
         public static string Redo => _catalog.Text("menu.redo");
         public static string Import => _catalog.Text("menu.import");
         public static string Export => _catalog.Text("menu.export");
+        public static string ExportFrame => _catalog.Text("menu.exportFrame");
 
         public static string AddToTimeline => _catalog.Text("menu.addToTimeline");
         public static string RemoveSource => _catalog.Text("menu.removeSource");
@@ -92,6 +94,7 @@ public static class I18n
 
         public static string Import => _catalog.Text("help.import");
         public static string Export => _catalog.Text("help.export");
+        public static string ExportFrame => _catalog.Text("help.exportFrame");
 
         public static string Zoom => _catalog.Text("help.zoom");
         public static string ZoomAtCursor => _catalog.Text("help.zoomAtCursor");
@@ -210,6 +213,15 @@ public static class I18n
         public static string AudioFormatHint => _catalog.Text("exportSetup.audioFormatHint");
 
         public static string AudioSpeedHint => _catalog.Text("exportSetup.audioSpeedHint");
+
+        public static string FrameTitle => _catalog.Text("exportSetup.frameTitle");
+        public static string SaveFrame => _catalog.Text("exportSetup.saveFrame");
+
+        public static string ImageFormat => _catalog.Text("exportSetup.imageFormat");
+        public static string ImageFormatHint => _catalog.Text("exportSetup.imageFormatHint");
+
+        public static string ImageQuality => _catalog.Text("exportSetup.imageQuality");
+        public static string ImageQualityHint => _catalog.Text("exportSetup.imageQualityHint");
     }
 
     public static class Dialogs
@@ -260,6 +272,7 @@ public static class I18n
     {
         public static string ImportTitle => _catalog.Text("fileDialogs.importTitle");
         public static string ExportTitle => _catalog.Text("fileDialogs.exportTitle");
+        public static string FrameTitle => _catalog.Text("fileDialogs.frameTitle");
         public static string MediaFiles => _catalog.Text("fileDialogs.mediaFiles");
         public static string VideoFiles => _catalog.Text("fileDialogs.videoFiles");
         public static string AudioFiles => _catalog.Text("fileDialogs.audioFiles");
@@ -271,8 +284,14 @@ public static class I18n
         public static string ContainerAudio(string container) =>
             _catalog.Format("fileDialogs.containerAudio", container.ToUpperInvariant());
 
+        public static string ContainerImage(string format) =>
+            _catalog.Format("fileDialogs.containerImage", format.ToUpperInvariant());
+
         public static string DefaultExportName(string container) =>
             _catalog.Format("fileDialogs.defaultExportName", container);
+
+        public static string DefaultFrameName(string format) =>
+            _catalog.Format("fileDialogs.defaultFrameName", format);
     }
 
     public static class Startup

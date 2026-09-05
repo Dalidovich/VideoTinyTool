@@ -15,6 +15,7 @@ public sealed class ToolbarPanel : PanelBase
     private readonly Button _undo = new(I18n.Toolbar.Undo, ButtonStyle.Ghost);
     private readonly Button _redo = new(I18n.Toolbar.Redo, ButtonStyle.Ghost);
     private readonly Button _export = new(I18n.Toolbar.Export, ButtonStyle.Accent);
+    private readonly Button _frame = new(I18n.Toolbar.Frame);
     private readonly Button _help = new(I18n.Toolbar.Help);
     private readonly Button _language = new(I18n.Language.Badge, ButtonStyle.Ghost);
 
@@ -31,6 +32,7 @@ public sealed class ToolbarPanel : PanelBase
         _undo.Clicked += host.Undo;
         _redo.Clicked += host.Redo;
         _export.Clicked += host.ExportTimeline;
+        _frame.Clicked += host.ExportFrame;
         _help.Clicked += host.ShowShortcuts;
         _language.Clicked += ShowLanguageMenu;
     }
@@ -44,6 +46,7 @@ public sealed class ToolbarPanel : PanelBase
             yield return _remove;
             yield return _undo;
             yield return _redo;
+            yield return _frame;
             yield return _export;
             yield return _help;
 
@@ -64,6 +67,7 @@ public sealed class ToolbarPanel : PanelBase
         _undo.Label = I18n.Toolbar.Undo;
         _redo.Label = I18n.Toolbar.Redo;
         _export.Label = I18n.Toolbar.Export;
+        _frame.Label = I18n.Toolbar.Frame;
         _help.Label = I18n.Toolbar.Help;
         _language.Label = I18n.Language.Badge;
     }
@@ -111,9 +115,14 @@ public sealed class ToolbarPanel : PanelBase
             new Vector2f(MathF.Round(Bounds.Left + Bounds.Width - 12f - exportWidth), MathF.Round(top)),
             new Vector2f(exportWidth, height));
 
+        var frameWidth = _frame.PreferredWidth(renderer);
+        _frame.Bounds = new FloatRect(
+            new Vector2f(MathF.Round(_export.Bounds.Left - gap - frameWidth), MathF.Round(top)),
+            new Vector2f(frameWidth, height));
+
         var helpWidth = Math.Max(height, _help.PreferredWidth(renderer));
         _help.Bounds = new FloatRect(
-            new Vector2f(MathF.Round(_export.Bounds.Left - 8f - helpWidth), MathF.Round(top)),
+            new Vector2f(MathF.Round(_frame.Bounds.Left - 8f - helpWidth), MathF.Round(top)),
             new Vector2f(helpWidth, height));
 
         _timecodeRight = _help.Bounds.Left;
@@ -138,6 +147,7 @@ public sealed class ToolbarPanel : PanelBase
         _undo.Enabled = _host.History.CanUndo;
         _redo.Enabled = _host.History.CanRedo;
         _export.Enabled = _host.Timeline.HasClips;
+        _frame.Enabled = _host.Timeline.HasVideoClips;
     }
 
     public override void Draw(Renderer renderer)

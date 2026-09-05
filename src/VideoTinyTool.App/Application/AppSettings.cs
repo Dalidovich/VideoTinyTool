@@ -33,12 +33,17 @@ public sealed class ExportSettings
     public string AudioCodec { get; set; } = "aac";
     public int AudioBitrateKbps { get; set; } = 192;
     public string AudioContainer { get; set; } = "mp3";
+    public string ImageFormat { get; set; } = "png";
+    public int ImageQuality { get; set; } = 4;
 
     public static double ClampSpeed(double value) =>
         double.IsFinite(value) && value > 0 ? Math.Clamp(value, MinSpeed, MaxSpeed) : NormalSpeed;
 
     public static string AudioCodecFor(string container) =>
         container.Equals("m4a", StringComparison.OrdinalIgnoreCase) ? "aac" : "libmp3lame";
+
+    public static bool UsesImageQuality(string format) =>
+        !format.Equals("png", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed class PreviewSettings
@@ -76,6 +81,8 @@ public sealed class AppSettings
         Export.Speed = ExportSettings.ClampSpeed(Export.Speed);
         Export.AudioBitrateKbps = Math.Clamp(Export.AudioBitrateKbps <= 0 ? 192 : Export.AudioBitrateKbps, 32, 512);
         Export.AudioContainer = Fallback(Export.AudioContainer, "mp3").TrimStart('.');
+        Export.ImageFormat = Fallback(Export.ImageFormat, "png").TrimStart('.').ToLowerInvariant();
+        Export.ImageQuality = Math.Clamp(Export.ImageQuality <= 0 ? 4 : Export.ImageQuality, 2, 31);
 
         Preview.Width = EvenClamp(Preview.Width, 960, 160, 3840);
         Preview.Height = EvenClamp(Preview.Height, 540, 90, 2160);

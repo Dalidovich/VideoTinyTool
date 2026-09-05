@@ -685,6 +685,7 @@ public sealed class PreviewPanel : PanelBase
         menu.Add(I18n.Menu.GoToEnd, "End", hasClips, () => _host.SeekTo(_host.Timeline.TotalDuration, false));
         menu.Separator();
         menu.Add(I18n.Menu.Split, "S", _host.SelectedClip is not null, _host.SplitAtPlayhead);
+        menu.Add(I18n.Menu.ExportFrame, "Ctrl+Shift+M", _host.Timeline.HasVideoClips, _host.ExportFrame);
 
         if (OverlayClip is { } clip)
         {

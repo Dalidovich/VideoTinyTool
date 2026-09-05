@@ -412,6 +412,10 @@ public sealed class EditorApplication : IEditorHost, IDisposable
                 ExportTimeline();
                 break;
 
+            case EditorCommand.ExportFrame:
+                ExportFrame();
+                break;
+
             case EditorCommand.ZoomIn:
                 _timelinePanel.ZoomBy(1.25f);
                 break;
@@ -785,7 +789,9 @@ public sealed class EditorApplication : IEditorHost, IDisposable
 
         _player.Pause();
 
-        var setup = new ExportSettingsDialog(_settings.Export, _timeline.IsAudioOnly);
+        var setup = new ExportSettingsDialog(
+            _settings.Export,
+            _timeline.IsAudioOnly ? ExportSetupMode.Audio : ExportSetupMode.Video);
 
         setup.AddButton(I18n.ExportSetup.Start, ButtonStyle.Accent, () =>
         {
@@ -840,6 +846,71 @@ public sealed class EditorApplication : IEditorHost, IDisposable
             _settings.Export,
             path,
             FFmpegArgumentBuilder.OutputDuration(_timeline.TotalDuration, _settings.Export));
+    }
+
+    public void ExportFrame()
+    {
+        if (!_timeline.HasVideoClips || _export.IsRunning)
+        {
+            return;
+        }
+
+        if (!FFmpegRuntime.Available)
+        {
+            ShowMessage(I18n.Dialogs.FFmpegMissingTitle, FFmpegRuntime.MissingBinariesMessage);
+            return;
+        }
+
+        RefreshMissingSources();
+        if (_missingSources.Count > 0)
+        {
+            ShowMessage(
+                I18n.Dialogs.MissingSourcesTitle,
+                I18n.Dialogs.MissingSourcesMessage(
+                    _missingSources.Select(id => FindSource(id)?.Path ?? id.ToString())));
+            return;
+        }
+
+        _player.Pause();
+
+        var setup = new ExportSettingsDialog(_settings.Export, ExportSetupMode.Frame);
+
+        setup.AddButton(I18n.ExportSetup.SaveFrame, ButtonStyle.Accent, () =>
+        {
+            setup.Close();
+            setup.Apply(_settings.Export);
+            BeginFrameExport();
+        });
+
+        setup.AddButton(I18n.Dialogs.Cancel, ButtonStyle.Normal, setup.Close);
+        ShowDialog(setup);
+    }
+
+    private void BeginFrameExport()
+    {
+        var format = _settings.Export.ImageFormat;
+
+        var path = NativeFileDialog.SaveFile(
+            _window.NativeHandle,
+            format,
+            I18n.FileDialogs.DefaultFrameName(format),
+            I18n.FileDialogs.ContainerImage(format),
+            I18n.FileDialogs.FrameTitle);
+
+        if (path is null)
+        {
+            return;
+        }
+
+        var position = _player.Position;
+
+        ShowExportProgress(path);
+
+        _export.StartFrame(
+            FFmpegArgumentBuilder.BuildFrameItem(_timeline, _sourceIndex, position),
+            FFmpegArgumentBuilder.BuildFrameOverlayItems(_timeline, _sourceIndex, position),
+            _settings.Export,
+            path);
     }
 
     private void ShowExportProgress(string path)

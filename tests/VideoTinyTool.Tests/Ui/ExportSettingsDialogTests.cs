@@ -50,12 +50,36 @@ public class ExportSettingsDialogTests
         };
 
         var target = new ExportSettings();
-        new ExportSettingsDialog(current, audioOnly: true).Apply(target);
+        new ExportSettingsDialog(current, ExportSetupMode.Audio).Apply(target);
 
         Assert.Equal("m4a", target.AudioContainer);
         Assert.Equal(256, target.AudioBitrateKbps);
         Assert.Equal(1.5, target.Speed);
         Assert.Equal(1920, target.Width);
         Assert.Equal(1080, target.Height);
+    }
+
+    [Fact]
+    public void FrameDialogAppliesTheImageRowsAndTheSharedResolution()
+    {
+        var current = new ExportSettings
+        {
+            Container = "mkv",
+            Width = 1280,
+            Height = 720,
+            FrameRate = 48,
+            ImageFormat = "jpg",
+            ImageQuality = 7
+        };
+
+        var target = new ExportSettings();
+        new ExportSettingsDialog(current, ExportSetupMode.Frame).Apply(target);
+
+        Assert.Equal("jpg", target.ImageFormat);
+        Assert.Equal(7, target.ImageQuality);
+        Assert.Equal(1280, target.Width);
+        Assert.Equal(720, target.Height);
+        Assert.Equal("mp4", target.Container);
+        Assert.Equal(30, target.FrameRate);
     }
 }

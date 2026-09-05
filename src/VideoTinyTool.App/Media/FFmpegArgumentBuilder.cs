@@ -37,6 +37,15 @@ public readonly record struct AudioItem(string SourcePath, TimeSpan In, TimeSpan
     public bool HasSound => Gain > 0f;
 }
 
+public readonly record struct FrameItem(string SourcePath, TimeSpan SourceOffset)
+{
+    public static FrameItem Gap => new(string.Empty, TimeSpan.Zero);
+
+    public bool IsGap => SourcePath.Length == 0;
+}
+
+public readonly record struct FrameOverlayItem(string SourcePath, TimeSpan SourceOffset, OverlayTransform Transform);
+
 public static class FFmpegArgumentBuilder
 {
     private const string SpeedVideoLabel = "[vspeed]";
@@ -117,6 +126,116 @@ public static class FFmpegArgumentBuilder
         }
 
         return items;
+    }
+
+    public static FrameItem BuildFrameItem(
+        Timeline timeline,
+        IReadOnlyDictionary<Guid, MediaSource> sources,
+        TimeSpan position) =>
+        timeline.Resolve(position) is { } location && sources.TryGetValue(location.Clip.SourceId, out var source)
+            ? new FrameItem(source.Path, location.SourceOffset)
+            : FrameItem.Gap;
+
+    public static IReadOnlyList<FrameOverlayItem> BuildFrameOverlayItems(
+        Timeline timeline,
+        IReadOnlyDictionary<Guid, MediaSource> sources,
+        TimeSpan position)
+    {
+        var items = new List<FrameOverlayItem>();
+
+        for (var trackIndex = 1; trackIndex < timeline.VideoTrackCount; trackIndex++)
+        {
+            if (timeline.Resolve(trackIndex, position) is { } location
+                && sources.TryGetValue(location.Clip.SourceId, out var source))
+            {
+                items.Add(new FrameOverlayItem(source.Path, location.SourceOffset, location.Clip.Overlay));
+            }
+        }
+
+        return items;
+    }
+
+    public static string BuildFrame(
+        FrameItem frame,
+        IReadOnlyList<FrameOverlayItem> overlays,
+        ExportSettings export,
+        string outputPath)
+    {
+        var args = new StringBuilder();
+        args.Append("-y -hide_banner");
+
+        if (!frame.IsGap)
+        {
+            args.Append(" -ss ").Append(Seconds(frame.SourceOffset));
+            args.Append(" -i ").Append(Quote(frame.SourcePath));
+        }
+
+        foreach (var overlay in overlays)
+        {
+            args.Append(" -ss ").Append(Seconds(overlay.SourceOffset));
+            args.Append(" -i ").Append(Quote(overlay.SourcePath));
+        }
+
+        args.Append(" -filter_complex ").Append(Quote(BuildFrameFilterGraph(frame, overlays, export)));
+        args.Append(" -map ").Append(Quote(FrameLabel(overlays)));
+        args.Append(" -frames:v 1 -update 1");
+
+        if (ExportSettings.UsesImageQuality(export.ImageFormat))
+        {
+            args.Append(" -q:v ").Append(export.ImageQuality.ToString(CultureInfo.InvariantCulture));
+        }
+
+        args.Append(' ').Append(Quote(outputPath));
+
+        return args.ToString();
+    }
+
+    public static string BuildFrameFilterGraph(
+        FrameItem frame,
+        IReadOnlyList<FrameOverlayItem> overlays,
+        ExportSettings export)
+    {
+        var width = export.Width.ToString(CultureInfo.InvariantCulture);
+        var height = export.Height.ToString(CultureInfo.InvariantCulture);
+
+        var graph = new StringBuilder();
+
+        if (frame.IsGap)
+        {
+            graph.Append("color=c=black:s=").Append(width).Append('x').Append(height).Append(":d=1");
+        }
+        else
+        {
+            graph.Append("[0:v]setpts=PTS-STARTPTS,");
+            graph.Append("scale=").Append(width).Append(':').Append(height)
+                 .Append(":force_original_aspect_ratio=decrease,");
+            graph.Append("pad=").Append(width).Append(':').Append(height).Append(":(ow-iw)/2:(oh-ih)/2");
+        }
+
+        graph.Append(",setsar=1,format=yuv420p[v]");
+
+        var accumulated = "[v]";
+        var input = frame.IsGap ? 0 : 1;
+
+        for (var k = 0; k < overlays.Count; k++)
+        {
+            var transform = overlays[k].Transform;
+
+            graph.Append(";[").Append(input + k).Append(":v]setpts=PTS-STARTPTS,");
+            graph.Append("scale=").Append(EvenWidth(export.Width, transform.Width)).Append(":-2,");
+            graph.Append("setsar=1,format=yuva420p,");
+            graph.Append("colorchannelmixer=aa=").Append(Number(transform.Opacity));
+            graph.Append("[ov").Append(k).Append("];");
+
+            graph.Append(accumulated).Append("[ov").Append(k).Append(']');
+            graph.Append("overlay=x=").Append(Coordinate(export.Width, transform.X));
+            graph.Append(":y=").Append(Coordinate(export.Height, transform.Y));
+            graph.Append("[acc").Append(k).Append(']');
+
+            accumulated = "[acc" + k.ToString(CultureInfo.InvariantCulture) + "]";
+        }
+
+        return graph.ToString();
     }
 
     public static string Build(IReadOnlyList<ExportItem> items, ExportSettings export, string outputPath) =>
@@ -490,6 +609,11 @@ public static class FFmpegArgumentBuilder
         ChangesSpeed(ExportSettings.ClampSpeed(export.Speed))
             ? SpeedAudioLabel
             : ComposedAudioLabel(overlays, audio);
+
+    private static string FrameLabel(IReadOnlyList<FrameOverlayItem> overlays) =>
+        overlays.Count == 0
+            ? "[v]"
+            : "[acc" + (overlays.Count - 1).ToString(CultureInfo.InvariantCulture) + "]";
 
     private static string ComposedVideoLabel(IReadOnlyList<OverlayItem> overlays) =>
         overlays.Count == 0

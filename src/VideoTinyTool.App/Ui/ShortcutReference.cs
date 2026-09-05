@@ -51,7 +51,8 @@ public static class ShortcutReference
         new ShortcutGroup(I18n.Help.Files,
         [
             new ShortcutEntry("Ctrl+O", I18n.Help.Import),
-            new ShortcutEntry("Ctrl+M", I18n.Help.Export)
+            new ShortcutEntry("Ctrl+M", I18n.Help.Export),
+            new ShortcutEntry("Ctrl+Shift+M", I18n.Help.ExportFrame)
         ]),
         new ShortcutGroup(I18n.Help.Dialogs,
         [

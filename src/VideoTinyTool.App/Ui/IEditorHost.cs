@@ -71,6 +71,8 @@ public interface IEditorHost
 
     void ExportTimeline();
 
+    void ExportFrame();
+
     void SplitAtPlayhead();
 
     void RemoveSelectedClip();

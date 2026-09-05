@@ -36,6 +36,44 @@ public class AppSettingsTests
     }
 
     [Theory]
+    [InlineData("", "png")]
+    [InlineData("   ", "png")]
+    [InlineData(".JPG", "jpg")]
+    [InlineData("jpg", "jpg")]
+    public void SanitizeNormalisesTheImageFormat(string format, string expected)
+    {
+        var settings = new AppSettings { Export = { ImageFormat = format } };
+
+        settings.Sanitize();
+
+        Assert.Equal(expected, settings.Export.ImageFormat);
+    }
+
+    [Theory]
+    [InlineData(0, 4)]
+    [InlineData(-3, 4)]
+    [InlineData(1, 2)]
+    [InlineData(7, 7)]
+    [InlineData(90, 31)]
+    public void SanitizeKeepsTheImageQualityInsideTheEncoderRange(int quality, int expected)
+    {
+        var settings = new AppSettings { Export = { ImageQuality = quality } };
+
+        settings.Sanitize();
+
+        Assert.Equal(expected, settings.Export.ImageQuality);
+    }
+
+    [Theory]
+    [InlineData("png", false)]
+    [InlineData("PNG", false)]
+    [InlineData("jpg", true)]
+    public void OnlyLossyImageFormatsUseTheQualitySetting(string format, bool expected)
+    {
+        Assert.Equal(expected, ExportSettings.UsesImageQuality(format));
+    }
+
+    [Theory]
     [InlineData("mp3", "libmp3lame")]
     [InlineData("m4a", "aac")]
     [InlineData("M4A", "aac")]

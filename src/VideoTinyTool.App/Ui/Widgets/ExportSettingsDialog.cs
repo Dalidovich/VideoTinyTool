@@ -6,6 +6,13 @@ using VideoTinyTool.Localization;
 
 namespace VideoTinyTool.Ui.Widgets;
 
+public enum ExportSetupMode
+{
+    Video,
+    Audio,
+    Frame
+}
+
 public sealed class ExportSettingsDialog : ModalDialog
 {
     private const char ResolutionSeparator = '×';
@@ -22,6 +29,7 @@ public sealed class ExportSettingsDialog : ModalDialog
     private static readonly string[] VideoCodecs = ["libx264", "libx265"];
     private static readonly string[] AudioCodecs = ["aac", "libmp3lame", "ac3"];
     private static readonly string[] AudioContainers = ["mp3", "m4a"];
+    private static readonly string[] ImageFormats = ["png", "jpg"];
 
     private static readonly string[] Presets =
     [
@@ -33,6 +41,7 @@ public sealed class ExportSettingsDialog : ModalDialog
     private static readonly int[] Qualities = [16, 18, 20, 23, 26, 30];
     private static readonly int[] FrameRates = [24, 25, 30, 50, 60];
     private static readonly int[] AudioBitrates = [96, 128, 160, 192, 256, 320];
+    private static readonly int[] ImageQualities = [2, 3, 4, 5, 7, 10, 15, 20, 31];
 
     private static readonly (int Width, int Height)[] Resolutions =
     [
@@ -44,11 +53,39 @@ public sealed class ExportSettingsDialog : ModalDialog
     private Vector2f _pointer;
     private Row? _hovered;
 
-    public ExportSettingsDialog(ExportSettings export, bool audioOnly = false)
-        : base(I18n.ExportSetup.Title, string.Empty)
+    public ExportSettingsDialog(ExportSettings export, ExportSetupMode mode = ExportSetupMode.Video)
+        : base(mode == ExportSetupMode.Frame ? I18n.ExportSetup.FrameTitle : I18n.ExportSetup.Title, string.Empty)
     {
-        _rows = audioOnly ? AudioRows(export) : VideoRows(export);
+        _rows = mode switch
+        {
+            ExportSetupMode.Audio => AudioRows(export),
+            ExportSetupMode.Frame => FrameRows(export),
+            _ => VideoRows(export)
+        };
     }
+
+    private static List<Row> FrameRows(ExportSettings export) =>
+        [
+            new Row(
+                I18n.ExportSetup.ImageFormat,
+                I18n.ExportSetup.ImageFormatHint,
+                new OptionPicker(Options(ImageFormats, export.ImageFormat), export.ImageFormat),
+                (settings, value) => settings.ImageFormat = value),
+
+            new Row(
+                I18n.ExportSetup.ImageQuality,
+                I18n.ExportSetup.ImageQualityHint,
+                new OptionPicker(Options(ImageQualities, export.ImageQuality), Number(export.ImageQuality)),
+                (settings, value) => settings.ImageQuality = Number(value)),
+
+            new Row(
+                I18n.ExportSetup.Resolution,
+                I18n.ExportSetup.ResolutionHint,
+                new OptionPicker(
+                    ResolutionOptions(export.Width, export.Height),
+                    Resolution(export.Width, export.Height)),
+                ApplyResolution)
+        ];
 
     private static List<Row> AudioRows(ExportSettings export) =>
         [
